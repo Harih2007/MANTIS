@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+  <title>MANTIS — See. Remember. Guide.</title>
+  <meta name="description" content="MANTIS assistive navigation prototype. Voice-guided object finding for blind and low-vision users."/>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <!-- Material Symbols -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <!-- Tailwind CDN (identical config to Stitch exports) -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-primary-fixed-variant": "#5c4300",
+            "surface": "#121416",
+            "on-surface": "#e2e2e5",
+            "primary-fixed": "#ffdf9f",
+            "surface-dim": "#121416",
+            "surface-container-highest": "#333537",
+            "on-tertiary-container": "#4e5459",
+            "secondary-fixed": "#6bff8f",
+            "outline-variant": "#4f4633",
+            "surface-container-high": "#282a2c",
+            "on-primary-container": "#6c4f00",
+            "on-secondary-fixed": "#002109",
+            "on-secondary-container": "#004119",
+            "on-secondary-fixed-variant": "#005321",
+            "surface-tint": "#f9bd22",
+            "surface-container-lowest": "#0c0e10",
+            "tertiary-container": "#c3c9ce",
+            "primary-fixed-dim": "#f9bd22",
+            "tertiary-fixed-dim": "#c1c7cc",
+            "secondary": "#4ae176",
+            "on-primary-fixed": "#261a00",
+            "on-tertiary-fixed-variant": "#41484c",
+            "outline": "#9c8f79",
+            "error": "#ffb4ab",
+            "surface-bright": "#38393c",
+            "primary": "#ffe1a7",
+            "secondary-container": "#00b954",
+            "inverse-surface": "#e2e2e5",
+            "surface-container-low": "#1a1c1e",
+            "on-error": "#690005",
+            "on-primary": "#402d00",
+            "on-surface-variant": "#d3c5ac",
+            "inverse-on-surface": "#2f3133",
+            "on-background": "#e2e2e5",
+            "inverse-primary": "#795900",
+            "primary-container": "#fbbf24",
+            "on-secondary": "#003915",
+            "secondary-fixed-dim": "#4ae176",
+            "tertiary": "#dfe5ea",
+            "on-error-container": "#ffdad6",
+            "on-tertiary-fixed": "#161c20",
+            "error-container": "#93000a",
+            "background": "#121416",
+            "surface-container": "#1e2022",
+            "tertiary-fixed": "#dde3e8",
+            "surface-variant": "#333537",
+            "on-tertiary": "#2b3135"
+          },
+          borderRadius: {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          spacing: {
+            "touch-min": "3rem",
+            "gutter-desktop": "2rem",
+            "margin-mobile": "1.25rem",
+            "gap-md": "1rem",
+            "gap-2xl": "3rem",
+            "gutter-mobile": "1rem",
+            "margin-tablet": "2rem",
+            "base": "0.25rem",
+            "gap-lg": "1.5rem",
+            "gap-sm": "0.75rem",
+            "gutter-tablet": "1.5rem",
+            "margin-desktop": "3rem",
+            "gap-xs": "0.5rem",
+            "gap-xl": "2rem"
+          },
+          fontFamily: {
+            "body-lg": ["Public Sans"],
+            "headline-lg": ["Manrope"],
+            "label-lg": ["Public Sans"],
+            "body-sm": ["Public Sans"],
+            "body-md": ["Public Sans"],
+            "headline-lg-mobile": ["Manrope"],
+            "label-md": ["Public Sans"],
+            "label-sm": ["Public Sans"],
+            "headline-sm": ["Manrope"],
+            "display": ["Manrope"],
+            "display-mobile": ["Manrope"],
+            "headline-md": ["Manrope"]
+          },
+          fontSize: {
+            "body-lg": ["1.125rem", { "lineHeight": "1.75rem", "letterSpacing": "0.01em", "fontWeight": "400" }],
+            "headline-lg": ["2rem", { "lineHeight": "2.5rem", "letterSpacing": "-0.015em", "fontWeight": "700" }],
+            "label-lg": ["1.125rem", { "lineHeight": "1.5rem", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "body-sm": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.015em", "fontWeight": "500" }],
+            "body-md": ["1rem", { "lineHeight": "1.5rem", "letterSpacing": "0.01em", "fontWeight": "400" }],
+            "headline-lg-mobile": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.015em", "fontWeight": "700" }],
+            "label-md": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.03em", "fontWeight": "600" }],
+            "label-sm": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "700" }],
+            "headline-sm": ["1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "0em", "fontWeight": "600" }],
+            "display": ["3rem", { "lineHeight": "3.5rem", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "display-mobile": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "headline-md": ["1.5rem", { "lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+
+<body class="bg-surface text-on-surface font-body-md text-body-md antialiased">
+  <!-- Live Region for Screen Reader Announcements -->
+  <div aria-live="assertive" aria-atomic="true" class="sr-only" role="status" id="sr-announcer"></div>
+
+  <!-- App Shell (mobile-width centered container) -->
+  <div id="app-shell" class="bg-surface relative">
+
+    <!-- ========================================
+         SCREEN 1: HOME / FIND
+         From: 1._home_find/code.html
+         ======================================== -->
+    <section id="screen-home" class="screen active" role="main" aria-label="Home - Find Objects">
+      <!-- Header -->
+      <header class="fixed top-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 z-50 bg-surface/90 backdrop-blur-md pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-between">
+          <div class="flex items-center gap-2 min-h-[48px]">
+            <span aria-label="MANTIS" class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary-container flex items-center gap-2.5">
+              <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[26px]">visibility</span>
+              <span>MANTIS</span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 flex flex-col relative w-full pt-20 pb-28 bg-surface px-margin-mobile">
+        <div class="flex flex-col w-full max-w-md mx-auto">
+          <!-- Voice Query Section -->
+          <section aria-label="Voice Query" class="flex flex-col items-center text-center pt-6 pb-8">
+            <h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface tracking-tight max-w-[280px] mb-8">
+              What are you looking for?
+            </h1>
+            <div class="relative flex items-center justify-center mb-6">
+              <div class="absolute w-24 h-24 rounded-full bg-primary-container/20 pointer-events-none" id="home-ambient-pulse"></div>
+              <button
+                aria-label="Tap to speak. Start voice search."
+                aria-pressed="false"
+                class="relative z-10 w-[72px] h-[72px] rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg shadow-primary-container/20 active:scale-95 transition-transform duration-150 focus:outline-none focus:ring-4 focus:ring-primary-fixed"
+                id="mic-trigger"
+                type="button"
+              >
+                <span class="material-symbols-outlined text-[36px] text-on-primary-container select-none" style="font-variation-settings: 'FILL' 1;">mic</span>
+              </button>
+            </div>
+            <div class="flex flex-col items-center gap-1.5">
+              <span class="font-headline-sm text-headline-sm font-bold text-on-surface" id="mic-status-text">Tap to speak</span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">or hold volume up</span>
+            </div>
+          </section>
+
+          <!-- Recent Items -->
+          <section aria-label="Recent Items" class="w-full mt-6">
+            <div class="px-1 mb-2">
+              <h2 class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant font-bold">RECENT</h2>
+            </div>
+            <div class="flex flex-col divide-y divide-surface-container-high">
+              <button aria-label="Find Headphones, last seen in Bedroom" class="flex items-center justify-between py-4 px-1 group transition-colors w-full text-left" id="recent-headphones">
+                <div class="flex flex-col">
+                  <span class="font-headline-sm text-headline-sm font-bold text-on-surface group-hover:text-primary-container transition-colors">Headphones</span>
+                  <span class="font-body-sm text-body-sm text-on-surface-variant">Bedroom</span>
+                </div>
+                <span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary-container transition-colors text-[24px]">chevron_right</span>
+              </button>
+              <button aria-label="Find Backpack, last seen in Living Room" class="flex items-center justify-between py-4 px-1 group transition-colors w-full text-left" id="recent-backpack">
+                <div class="flex flex-col">
+                  <span class="font-headline-sm text-headline-sm font-bold text-on-surface group-hover:text-primary-container transition-colors">Backpack</span>
+                  <span class="font-body-sm text-body-sm text-on-surface-variant">Living Room</span>
+                </div>
+                <span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary-container transition-colors text-[24px]">chevron_right</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- My Space Link -->
+          <section aria-label="My Space" class="w-full mt-10">
+            <button aria-label="My Space: Your environment, remembered." class="group flex items-center justify-between py-4 px-1 border-t border-surface-container-high transition-colors w-full text-left" id="home-myspace-link">
+              <div class="flex flex-col gap-0.5">
+                <span class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant font-bold">MY SPACE</span>
+                <span class="font-headline-sm text-headline-sm font-bold text-on-surface group-hover:text-primary-container transition-colors">
+                  Your environment, remembered.
+                </span>
+              </div>
+              <span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary-container transition-colors text-[24px]">chevron_right</span>
+            </button>
+          </section>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 2: LISTENING
+         From: 2._listening_state/code.html
+         ======================================== -->
+    <section id="screen-listening" class="screen" role="main" aria-label="Listening for voice command">
+      <header class="fixed top-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.3)] pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-between">
+          <div class="flex items-center gap-2 min-h-[48px]">
+            <span aria-label="MANTIS" class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary-container flex items-center gap-2">
+              <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[28px]">visibility</span>
+              <span>MANTIS</span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 flex flex-col items-center justify-between relative w-full pt-20 pb-28 bg-surface px-margin-mobile min-h-screen min-h-[100dvh]">
+        <!-- Central Acoustic Focus Area -->
+        <div class="flex-1 flex flex-col items-center justify-center w-full my-auto select-none">
+          <!-- Breathing Sound Wave Rings & Large Mic -->
+          <div class="relative flex items-center justify-center w-80 h-80 my-4">
+            <div class="absolute w-72 h-72 rounded-full bg-primary-container pulse-ring-outer pointer-events-none"></div>
+            <div class="absolute w-56 h-56 rounded-full bg-primary-container pulse-ring-inner pointer-events-none"></div>
+            <div class="absolute w-40 h-40 rounded-full bg-primary-container/20 pointer-events-none"></div>
+            <div class="relative z-10 flex items-center justify-center w-24 h-24 rounded-full bg-primary-container shadow-[0_4px_30px_rgba(251,191,36,0.4)]">
+              <span class="material-symbols-outlined text-on-primary-container text-[44px] font-bold" style="font-variation-settings: 'FILL' 1;">mic</span>
+            </div>
+          </div>
+          <!-- Status Text -->
+          <div class="flex flex-col items-center text-center px-4 mt-4">
+            <h1 class="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight" id="listening-title">
+              I'm listening...
+            </h1>
+            <p class="font-body-lg text-body-lg text-on-surface-variant mt-2" id="listening-subtitle">
+              Say what you're looking for.
+            </p>
+          </div>
+
+          <!-- Fallback Input (shown when speech API unavailable) -->
+          <div class="fallback-input-container items-center mt-4" id="fallback-input-area" style="display:none;">
+            <input type="text" class="fallback-input" id="fallback-text-input" placeholder="Type what you're looking for..." aria-label="Type what you're looking for"/>
+            <button class="demo-chip" id="demo-chip-backpack" aria-label="Quick demo: Find my backpack">
+              <span class="material-symbols-outlined text-[18px]">backpack</span>
+              <span>"Find my backpack"</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Cancel Button -->
+        <div class="w-full flex justify-center pt-6 pb-2">
+          <button aria-label="Cancel voice search" class="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95 transition-all text-label-md font-label-md min-h-[48px]" id="listening-cancel" type="button">
+            Cancel
+          </button>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 3: UNDERSTOOD
+         From: 3._understood_state/code.html
+         ======================================== -->
+    <section id="screen-understood" class="screen" role="main" aria-label="Processing your request">
+      <header class="fixed top-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.3)] pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-between">
+          <div class="flex items-center gap-gap-xs min-h-[48px]">
+            <span aria-label="MANTIS" class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary-container flex items-center gap-2">
+              <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[28px]">visibility</span>
+              <span>MANTIS</span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 flex flex-col justify-between relative w-full pt-20 pb-28 bg-surface px-margin-mobile min-h-screen min-h-[100dvh]">
+        <div class="flex flex-col w-full flex-1 justify-center max-w-sm mx-auto my-auto">
+          <!-- Finding Badge -->
+          <div class="mb-8 flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high text-primary-container">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
+              <span class="font-label-sm text-label-sm uppercase tracking-widest font-semibold">FINDING</span>
+            </span>
+          </div>
+          <!-- Query Display -->
+          <div class="mb-4">
+            <h1 class="font-headline-lg text-3xl sm:text-4xl font-bold text-on-surface tracking-tight leading-tight" id="understood-query">"My backpack"</h1>
+          </div>
+          <p class="font-body-lg text-primary text-xl font-normal tracking-normal mb-10" id="understood-status">"Finding your backpack..."</p>
+          <!-- Progress Bar -->
+          <div class="w-full">
+            <div class="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden relative">
+              <div class="h-full bg-primary-container rounded-full progress-animate shadow-[0_0_8px_rgba(251,191,36,0.4)]" id="understood-progress-bar"></div>
+            </div>
+            <div class="flex items-center justify-between text-outline text-xs mt-3">
+              <span class="tracking-wide">Starting camera</span>
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-primary-container/80 animate-ping"></span>
+            </div>
+          </div>
+        </div>
+        <!-- Cancel -->
+        <div class="flex justify-center pb-8 pt-4">
+          <button class="inline-flex items-center justify-center gap-2 px-6 h-12 min-h-[48px] rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95 transition-all text-sm font-label-md" id="understood-cancel" type="button">
+            <span aria-hidden="true" class="material-symbols-outlined text-[20px]">close</span>
+            <span>Cancel</span>
+          </button>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 4: LIVE CAMERA SEARCH
+         From: 4._live_camera_search/code.html
+         ======================================== -->
+    <section id="screen-searching" class="screen screen-immersive" role="main" aria-label="Searching for your backpack with camera">
+      <!-- Camera Feed / Fallback -->
+      <video id="camera-video" class="camera-feed" autoplay playsinline muted aria-label="Live camera view"></video>
+      <div id="camera-fallback-bg" class="camera-fallback" role="img" aria-label="Camera view placeholder" style="background-image: url('https://lh3.googleusercontent.com/aida/AEtjO1V3RBwH1A_ItSUPzMiRRitIUXHiQwbevrje5X-nN8Ff3kha0I5jEIKJ8PjfJt8sUU1O2PCO24WQwJ90V9Lut3jdF-oEOeU9wwZdi011ulyLJDG-dfKNaVwGIYL34CeLUzA59m9fcRdr1BsrehQVYJwtVJ7tSCuvIt850R4CkWSpr5n6yuatYLSuHvhuLXuC-q6jSnRawVXkn-5bJJ3qlQtGqbp4tlPI4774mWG-1y1ZczLjE3Mnv5y231Q'); display:none;"></div>
+
+      <!-- Scan line effect -->
+      <div class="scan-line" id="search-scan-line"></div>
+
+      <!-- Vignette overlays -->
+      <div class="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-surface/80 via-surface/30 to-transparent pointer-events-none z-10"></div>
+      <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-surface/85 via-surface/30 to-transparent pointer-events-none z-10"></div>
+
+      <!-- Top Indicator -->
+      <div class="absolute top-0 inset-x-0 pt-safe z-30 pointer-events-none">
+        <div class="pt-4 flex items-center justify-center">
+          <div class="pointer-events-auto flex items-center gap-2.5 px-4 py-2 rounded-full bg-surface-container-lowest/80 backdrop-blur-md border border-white/10 shadow-lg">
+            <span class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary-container text-[14px]">MANTIS</span>
+            <div class="w-px h-3 bg-white/20"></div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
+              <span class="font-label-sm text-label-sm tracking-wide text-on-surface" id="search-status-text">Finding backpack</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bounding Box (initially hidden) -->
+      <div class="absolute z-20 pointer-events-none flex flex-col items-start" style="left: 67%; top: 48%; width: 28%; height: 36%; display:none;" id="search-bounding-box">
+        <div class="relative w-full h-full bbox-animate">
+          <div class="absolute -top-7 left-0 px-2.5 py-0.5 rounded bg-primary-container text-on-primary shadow-md">
+            <span class="font-label-sm text-[11px] font-bold tracking-wider">BACKPACK</span>
+          </div>
+          <div class="w-full h-full border-2 border-primary-container rounded-sm bg-primary-container/10"></div>
+        </div>
+      </div>
+
+      <!-- Cancel Button -->
+      <div class="absolute bottom-0 inset-x-0 pb-safe z-30 flex items-center justify-center pb-6">
+        <button aria-label="Cancel search" class="h-11 px-6 rounded-full bg-surface-container-high/85 backdrop-blur-md border border-white/10 text-on-surface hover:bg-surface-container-highest active:scale-95 transition-all shadow-lg flex items-center gap-2 font-label-md text-label-md min-h-[48px]" id="searching-cancel" type="button">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+          <span>Cancel</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================
+         SCREEN 5: OBJECT FOUND
+         From: 5._object_found/code.html
+         ======================================== -->
+    <section id="screen-found" class="screen screen-immersive" role="main" aria-label="Object found - Backpack located to your right">
+      <!-- Camera Background -->
+      <div class="fixed inset-0 w-full max-w-[430px] mx-auto h-full z-0 overflow-hidden">
+        <video id="found-camera-video" class="camera-feed" autoplay playsinline muted></video>
+        <div id="found-camera-fallback" class="camera-fallback" style="background-image: url('https://lh3.googleusercontent.com/aida/AEtjO1V3RBwH1A_ItSUPzMiRRitIUXHiQwbevrje5X-nN8Ff3kha0I5jEIKJ8PjfJt8sUU1O2PCO24WQwJ90V9Lut3jdF-oEOeU9wwZdi011ulyLJDG-dfKNaVwGIYL34CeLUzA59m9fcRdr1BsrehQVYJwtVJ7tSCuvIt850R4CkWSpr5n6yuatYLSuHvhuLXuC-q6jSnRawVXkn-5bJJ3qlQtGqbp4tlPI4774mWG-1y1ZczLjE3Mnv5y231Q'); display:none;"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-surface-container-lowest/80 via-transparent to-surface-container-lowest/90 pointer-events-none"></div>
+      </div>
+
+      <!-- Header -->
+      <header class="relative z-30 w-full bg-surface/75 backdrop-blur-md pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-between gap-gap-sm">
+          <div class="flex items-center gap-gap-sm">
+            <button aria-label="Go back" class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-high/80 text-on-surface hover:bg-surface-container-highest transition-colors" id="found-back-btn" type="button">
+              <span aria-hidden="true" class="material-symbols-outlined text-[24px]">arrow_back_ios_new</span>
+            </button>
+            <h1 class="font-headline-sm text-headline-sm font-bold tracking-tight text-on-surface truncate">Active Wayfinding Session</h1>
+          </div>
+          <div class="flex items-center gap-gap-xs">
+            <button aria-label="Voice Guidance" class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-high/80 text-on-surface hover:bg-surface-container-highest transition-colors" type="button">
+              <span aria-hidden="true" class="material-symbols-outlined text-[24px]">volume_up</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Overlay -->
+      <main class="relative z-20 flex-1 flex flex-col justify-between px-margin-mobile pb-safe">
+        <!-- Found Status Card -->
+        <div class="pt-4 flex flex-col gap-2 slide-down">
+          <div class="bg-surface-container-high/90 backdrop-blur-md p-4 rounded-DEFAULT shadow-2xl border border-white/5 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="inline-flex items-center gap-1.5 bg-primary-container text-on-primary-container px-2.5 py-1 rounded-full font-label-sm text-label-sm uppercase tracking-wider font-bold">
+                <span aria-hidden="true" class="w-2 h-2 rounded-full bg-on-primary-container"></span>
+                <span>FOUND</span>
+              </div>
+              <div class="font-headline-md text-headline-sm font-extrabold tracking-tight text-on-surface flex items-center gap-1.5 text-right">
+                <span>TO YOUR RIGHT</span>
+                <span aria-hidden="true" class="text-primary-container font-black">→</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 pt-1 border-t border-white/10 text-on-surface">
+              <span aria-hidden="true" class="material-symbols-outlined text-[20px] text-primary-container shrink-0">record_voice_over</span>
+              <p class="font-body-md text-body-md font-medium">"Your backpack is to your right."</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bounding Box on Backpack -->
+        <div class="absolute right-[10%] bottom-[24%] w-[38%] h-[38%] pointer-events-none z-10">
+          <div class="w-full h-full rounded-DEFAULT border-2 border-primary-container bg-primary-container/10 shadow-[0_0_12px_rgba(251,191,36,0.35)] bbox-animate">
+            <div class="absolute -top-3.5 left-2 bg-primary-container text-on-primary-container text-label-sm font-bold px-2 py-0.5 rounded-full shadow-sm">
+              BACKPACK
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pb-6 flex flex-col gap-3">
+          <button aria-label="Continue guidance to backpack" class="w-full h-14 bg-primary-container text-on-primary-container hover:bg-primary-fixed-dim active:scale-[0.99] rounded-full flex items-center justify-center gap-2 font-headline-sm text-label-lg font-bold shadow-xl transition-all" id="btn-continue-guidance" type="button">
+            <span>CONTINUE GUIDANCE</span>
+            <span aria-hidden="true" class="material-symbols-outlined text-[24px] font-bold">arrow_forward</span>
+          </button>
+          <button aria-label="Cancel guidance" class="w-full h-12 bg-surface-container-high/90 backdrop-blur-md text-on-surface hover:bg-surface-container-highest active:scale-[0.99] rounded-full flex items-center justify-center font-label-md text-label-md font-semibold transition-colors min-h-[48px]" id="found-cancel" type="button">
+            Cancel
+          </button>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 6: ACTIVE GUIDANCE
+         From: 6._active_guidance/code.html
+         ======================================== -->
+    <section id="screen-guidance" class="screen screen-immersive" role="main" aria-label="Active guidance in progress">
+      <!-- Camera Background -->
+      <div class="absolute inset-0 bg-cover bg-center" id="guidance-camera-bg" style="background-image: url('https://lh3.googleusercontent.com/aida/AEtjO1V3RBwH1A_ItSUPzMiRRitIUXHiQwbevrje5X-nN8Ff3kha0I5jEIKJ8PjfJt8sUU1O2PCO24WQwJ90V9Lut3jdF-oEOeU9wwZdi011ulyLJDG-dfKNaVwGIYL34CeLUzA59m9fcRdr1BsrehQVYJwtVJ7tSCuvIt850R4CkWSpr5n6yuatYLSuHvhuLXuC-q6jSnRawVXkn-5bJJ3qlQtGqbp4tlPI4774mWG-1y1ZczLjE3Mnv5y231Q');">
+        <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none"></div>
+      </div>
+      <video id="guidance-camera-video" class="camera-feed" autoplay playsinline muted style="display:none;"></video>
+
+      <main class="relative z-10 w-full h-full min-h-screen min-h-[100dvh] flex flex-col justify-between items-center px-margin-mobile pt-safe pb-safe">
+        <!-- State Indicator & Spoken Sentence -->
+        <div class="w-full flex flex-col items-center pt-8 sm:pt-12 gap-5 max-w-sm">
+          <div class="inline-flex items-center gap-2.5 px-6 py-2.5 rounded-full bg-primary-container text-on-primary-container shadow-2xl transition-transform direction-animate" id="guidance-direction-pill">
+            <span class="w-2.5 h-2.5 rounded-full bg-on-primary-container animate-ping"></span>
+            <span class="font-label-md text-label-md tracking-wider font-bold uppercase" id="guidance-direction-text">MOVE RIGHT</span>
+          </div>
+          <div class="w-full px-6 py-4 rounded-2xl bg-surface-container-lowest/80 backdrop-blur-xl border border-white/5 shadow-2xl text-center direction-animate" id="guidance-instruction-card">
+            <p class="font-headline-sm text-headline-sm sm:text-headline-md text-on-surface font-semibold tracking-normal leading-snug" id="guidance-instruction-text">
+              "Your backpack is to the right. Turn right slowly."
+            </p>
+          </div>
+        </div>
+
+        <!-- Spacer -->
+        <div class="flex-1"></div>
+
+        <!-- Pause Button -->
+        <div class="w-full flex flex-col items-center pb-6">
+          <button aria-label="Pause Guidance" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-surface-container-high/80 backdrop-blur-xl border border-white/10 text-on-surface hover:bg-surface-container-highest active:scale-95 transition-all shadow-lg min-h-[48px]" id="guidance-pause-btn" type="button">
+            <span class="material-symbols-outlined text-[20px] text-primary-container" id="guidance-pause-icon">pause_circle</span>
+            <span class="font-label-md text-label-md font-medium text-on-surface/90" id="guidance-pause-text">Pause Guidance</span>
+          </button>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 7: OBJECT REACHED
+         From: 7._object_reached/code.html
+         ======================================== -->
+    <section id="screen-reached" class="screen screen-immersive" role="main" aria-label="Object reached - Your backpack is here">
+      <!-- Background -->
+      <div class="fixed inset-0 w-full max-w-[430px] mx-auto z-0">
+        <div class="w-full h-full bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida/AEtjO1V3RBwH1A_ItSUPzMiRRitIUXHiQwbevrje5X-nN8Ff3kha0I5jEIKJ8PjfJt8sUU1O2PCO24WQwJ90V9Lut3jdF-oEOeU9wwZdi011ulyLJDG-dfKNaVwGIYL34CeLUzA59m9fcRdr1BsrehQVYJwtVJ7tSCuvIt850R4CkWSpr5n6yuatYLSuHvhuLXuC-q6jSnRawVXkn-5bJJ3qlQtGqbp4tlPI4774mWG-1y1ZczLjE3Mnv5y231Q');"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-surface/90 via-surface/40 to-surface/95"></div>
+      </div>
+
+      <!-- Header -->
+      <header class="relative z-20 w-full pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-center">
+          <div class="flex items-center gap-2 text-on-surface/80 tracking-widest uppercase font-bold text-xs">
+            <span class="w-2 h-2 rounded-full bg-secondary success-pulse"></span>
+            <span>MANTIS</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <main class="relative z-20 flex-1 flex flex-col justify-end px-margin-mobile pb-safe w-full max-w-md mx-auto">
+        <div class="flex flex-col items-center text-center gap-6 mb-4">
+          <div class="flex flex-col items-center gap-2">
+            <h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold tracking-tight text-on-surface">OBJECT REACHED</h1>
+            <p class="font-body-lg text-body-lg text-on-surface-variant">"Your backpack is here."</p>
+          </div>
+          <button class="w-full h-14 rounded-full bg-primary-container text-on-primary font-headline-sm text-label-lg font-bold flex items-center justify-center shadow-lg active:scale-[0.98] transition-all cursor-pointer min-h-[56px]" id="reached-done-btn" type="button">DONE</button>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 8: MY SPACE
+         From: 8._my_space/code.html
+         ======================================== -->
+    <section id="screen-space" class="screen" role="main" aria-label="My Space - Your environment remembered">
+      <header class="fixed top-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 z-50 bg-surface/85 backdrop-blur-xl pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span aria-label="MANTIS" class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary-container flex items-center gap-2">
+              <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[28px]">visibility</span>
+              <span>MANTIS</span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 flex flex-col relative w-full pt-20 pb-28 bg-surface px-margin-mobile max-w-lg mx-auto">
+        <div class="flex flex-col w-full gap-8">
+          <header class="flex flex-col gap-1.5 pt-2">
+            <h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface tracking-tight uppercase">MY SPACE</h1>
+            <p class="font-body-md text-body-md text-on-surface-variant">Your environment, remembered.</p>
+          </header>
+
+          <!-- Spatial Overview Map -->
+          <section aria-label="Spatial Overview" class="relative w-full rounded-lg bg-surface-container-low border border-outline-variant/30 p-4 overflow-hidden">
+            <div class="flex items-center justify-between pb-3 border-b border-outline-variant/20 mb-3">
+              <span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Layout</span>
+              <span class="font-body-sm text-[12px] text-on-surface-variant">3 remembered zones</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 h-24">
+              <div class="bg-surface-container rounded p-2 flex flex-col justify-between border border-primary-container/20">
+                <span class="font-label-sm text-[11px] text-on-surface-variant font-medium">Bedroom</span>
+                <span class="font-label-sm text-[12px] text-primary font-semibold truncate flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>Headphones
+                </span>
+              </div>
+              <div class="bg-surface-container rounded p-2 flex flex-col justify-between border border-primary-container/20">
+                <span class="font-label-sm text-[11px] text-on-surface-variant font-medium">Living Room</span>
+                <span class="font-label-sm text-[12px] text-primary font-semibold truncate flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>Backpack
+                </span>
+              </div>
+              <div class="bg-surface-container rounded p-2 flex flex-col justify-between border border-primary-container/20">
+                <span class="font-label-sm text-[11px] text-on-surface-variant font-medium">Kitchen</span>
+                <span class="font-label-sm text-[12px] text-primary font-semibold truncate flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>Bottle
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Rooms List -->
+          <section aria-label="Remembered Rooms and Items" class="flex flex-col gap-3">
+            <!-- Bedroom -->
+            <div class="flex items-center justify-between p-4 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors">
+              <div class="flex items-center gap-4">
+                <div class="w-11 h-11 rounded-full bg-surface-container-high flex items-center justify-center text-primary-container shrink-0">
+                  <span aria-hidden="true" class="material-symbols-outlined text-[24px]">bed</span>
+                </div>
+                <div class="flex flex-col">
+                  <h2 class="font-headline-sm text-[1.125rem] text-on-surface font-semibold">Bedroom</h2>
+                  <span class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+                    <span aria-hidden="true" class="material-symbols-outlined text-[18px] text-primary-container">headphones</span>
+                    Headphones
+                  </span>
+                </div>
+              </div>
+              <button aria-label="Navigate to Headphones in Bedroom" class="px-3.5 py-2 rounded-full bg-surface-container-high text-primary font-label-md text-label-md flex items-center gap-1 hover:bg-surface-container-highest transition-colors min-h-[48px]" type="button">
+                <span>Navigate</span>
+                <span aria-hidden="true" class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </button>
+            </div>
+            <!-- Living Room -->
+            <div class="flex items-center justify-between p-4 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors">
+              <div class="flex items-center gap-4">
+                <div class="w-11 h-11 rounded-full bg-surface-container-high flex items-center justify-center text-primary-container shrink-0">
+                  <span aria-hidden="true" class="material-symbols-outlined text-[24px]">weekend</span>
+                </div>
+                <div class="flex flex-col">
+                  <h2 class="font-headline-sm text-[1.125rem] text-on-surface font-semibold">Living Room</h2>
+                  <span class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+                    <span aria-hidden="true" class="material-symbols-outlined text-[18px] text-primary-container">backpack</span>
+                    Backpack
+                  </span>
+                </div>
+              </div>
+              <button aria-label="Navigate to Backpack in Living Room" class="px-3.5 py-2 rounded-full bg-surface-container-high text-primary font-label-md text-label-md flex items-center gap-1 hover:bg-surface-container-highest transition-colors min-h-[48px] space-navigate-backpack" type="button">
+                <span>Navigate</span>
+                <span aria-hidden="true" class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </button>
+            </div>
+            <!-- Kitchen -->
+            <div class="flex items-center justify-between p-4 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors">
+              <div class="flex items-center gap-4">
+                <div class="w-11 h-11 rounded-full bg-surface-container-high flex items-center justify-center text-primary-container shrink-0">
+                  <span aria-hidden="true" class="material-symbols-outlined text-[24px]">countertops</span>
+                </div>
+                <div class="flex flex-col">
+                  <h2 class="font-headline-sm text-[1.125rem] text-on-surface font-semibold">Kitchen</h2>
+                  <span class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+                    <span aria-hidden="true" class="material-symbols-outlined text-[18px] text-primary-container">water_bottle</span>
+                    Bottle
+                  </span>
+                </div>
+              </div>
+              <button aria-label="Navigate to Bottle in Kitchen" class="px-3.5 py-2 rounded-full bg-surface-container-high text-primary font-label-md text-label-md flex items-center gap-1 hover:bg-surface-container-highest transition-colors min-h-[48px]" type="button">
+                <span>Navigate</span>
+                <span aria-hidden="true" class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 9: OBJECT MEMORY (sub-page)
+         From: 9._object_memory/code.html
+         ======================================== -->
+    <section id="screen-object-memory" class="screen" role="main" aria-label="Object Memory - Headphones detail">
+      <header class="fixed top-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 z-50 bg-surface/90 backdrop-blur-xl pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-between">
+          <button aria-label="Go back" class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-high text-on-surface hover:text-primary hover:bg-surface-container-highest transition-colors active:scale-95 min-h-[48px]" id="obj-memory-back" type="button">
+            <span aria-hidden="true" class="material-symbols-outlined text-[24px]">arrow_back_ios_new</span>
+          </button>
+          <span class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary-container">MANTIS</span>
+          <div class="w-12"></div>
+        </div>
+      </header>
+
+      <main class="flex-1 flex flex-col justify-between w-full pt-20 px-margin-mobile pb-safe max-w-lg mx-auto pb-8">
+        <div class="flex flex-col pt-2">
+          <div class="flex flex-col gap-1 mb-6 text-left">
+            <h1 class="font-headline-lg font-extrabold tracking-tight text-primary text-3xl sm:text-4xl">HEADPHONES</h1>
+            <p class="font-headline-sm text-headline-sm font-semibold text-on-surface-variant flex items-center gap-1.5 pt-0.5">
+              <span aria-hidden="true" class="material-symbols-outlined text-[22px] text-primary-container">pin_drop</span>
+              <span>Last seen in Bedroom</span>
+            </p>
+          </div>
+          <div class="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-surface-container shadow-lg border border-outline-variant/30">
+            <img alt="Headphones on bedroom nightstand" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoVDaDJUlamk508caJyIkCg4IYUj35aTpIRX8MzpKQVCkzcYLDtQJsnYYh3LSogxiRgLWUjb61jlGbH0irR83X5v7OcBvcX2JbJlMqUelLrG9Vv3dbxz6K2UaXyNbABgCX81l5FjNBoYCR57Jx5MRo1NYnsJV6uTTv_tZUP_jfOpRCNQPj0s0EpY00HkMkB7awXOVilvg0958rNnxWNjCh1kRKTRXYdT-zDWJcx5BdkzB5aYFRpMOxWQ"/>
+          </div>
+        </div>
+        <div class="flex flex-col gap-3 py-6">
+          <button aria-label="Find Headphones" class="w-full h-16 bg-primary-container active:bg-surface-tint text-on-secondary-container hover:brightness-105 rounded-full flex items-center justify-between px-7 shadow-lg transition-transform active:scale-[0.98] focus:outline-none min-h-[56px]" id="find-headphones-btn" type="button">
+            <div class="flex items-center gap-3.5">
+              <span aria-hidden="true" class="material-symbols-outlined text-[26px] text-on-secondary-container" style="font-variation-settings: 'FILL' 1;">near_me</span>
+              <span class="font-headline-sm text-headline-sm font-bold tracking-tight text-on-secondary-container">FIND HEADPHONES</span>
+            </div>
+            <span aria-hidden="true" class="material-symbols-outlined text-[26px] text-on-secondary-container font-bold">arrow_forward</span>
+          </button>
+          <button aria-label="Update Location" class="w-full h-14 bg-surface-container-high active:bg-surface-container-highest text-on-surface rounded-full flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] min-h-[48px]" type="button">
+            <span aria-hidden="true" class="material-symbols-outlined text-[22px] text-primary">add_a_photo</span>
+            <span class="font-label-lg text-label-lg font-bold tracking-wide uppercase text-on-surface">UPDATE LOCATION</span>
+          </button>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         SCREEN 10: SETTINGS & ACCESSIBILITY
+         From: 10._settings_accessibility/code.html
+         ======================================== -->
+    <section id="screen-settings" class="screen" role="main" aria-label="Settings and Accessibility Preferences">
+      <header class="fixed top-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.3)] pt-safe">
+        <div class="h-16 px-margin-mobile flex items-center justify-between gap-gap-sm">
+          <div class="flex items-center gap-gap-xs min-h-[48px]">
+            <span aria-label="MANTIS" class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary-container flex items-center gap-2">
+              <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[28px]">visibility</span>
+              <span>MANTIS</span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 flex flex-col relative w-full pt-16 pb-24 bg-surface px-margin-mobile">
+        <div class="flex flex-col w-full gap-gap-lg pb-6">
+          <div class="pt-4 pb-1">
+            <h1 class="font-headline-md text-headline-md font-bold tracking-tight text-on-surface">SETTINGS & ACCESSIBILITY</h1>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Configure your assistive preferences and feedback</p>
+          </div>
+
+          <!-- Settings List -->
+          <div class="flex flex-col bg-surface-container rounded-2xl divide-y divide-surface-container-high overflow-hidden shadow-sm">
+            <!-- Voice Feedback -->
+            <div class="flex items-center justify-between min-h-[64px] p-4 cursor-pointer select-none transition-colors hover:bg-surface-container-high" role="switch" aria-checked="true" tabindex="0" id="toggle-voice-row">
+              <div class="flex items-center gap-3 pr-4">
+                <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[24px]">record_voice_over</span>
+                <div class="flex flex-col">
+                  <span class="font-label-lg text-label-lg font-semibold text-on-surface">Voice</span>
+                  <span class="font-body-sm text-body-sm text-on-surface-variant">Voice feedback and spoken turn alerts</span>
+                </div>
+              </div>
+              <div class="toggle-track active" id="toggle-voice">
+                <div class="toggle-thumb"></div>
+              </div>
+            </div>
+
+            <!-- Speech Speed -->
+            <div class="flex flex-col gap-3 p-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[24px]">speed</span>
+                  <span class="font-label-lg text-label-lg font-semibold text-on-surface">Speech Speed</span>
+                </div>
+                <span class="font-label-md text-label-md text-primary-container font-bold" id="speech-speed-indicator">1.25x</span>
+              </div>
+              <div aria-label="Speech Speed Selection" class="grid grid-cols-3 gap-2 bg-surface-container-lowest p-1.5 rounded-full" role="radiogroup">
+                <button aria-checked="false" class="speed-btn flex items-center justify-center min-h-[44px] rounded-full text-on-surface-variant font-label-md text-label-md hover:text-on-surface transition-all" data-speed="1.0x" role="radio" type="button">1.0x</button>
+                <button aria-checked="true" class="speed-btn flex items-center justify-center min-h-[44px] rounded-full bg-primary-container text-on-primary font-label-md text-label-md font-bold shadow-md transition-all" data-speed="1.25x" role="radio" type="button">1.25x</button>
+                <button aria-checked="false" class="speed-btn flex items-center justify-center min-h-[44px] rounded-full text-on-surface-variant font-label-md text-label-md hover:text-on-surface transition-all" data-speed="1.5x" role="radio" type="button">1.5x</button>
+              </div>
+            </div>
+
+            <!-- Haptics -->
+            <div class="flex items-center justify-between min-h-[64px] p-4 cursor-pointer select-none transition-colors hover:bg-surface-container-high" role="switch" aria-checked="true" tabindex="0" id="toggle-haptics-row">
+              <div class="flex items-center gap-3 pr-4">
+                <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[24px]">vibration</span>
+                <div class="flex flex-col">
+                  <span class="font-label-lg text-label-lg font-semibold text-on-surface">Haptics</span>
+                  <span class="font-body-sm text-body-sm text-on-surface-variant">Directional vibration cues</span>
+                </div>
+              </div>
+              <div class="toggle-track active" id="toggle-haptics">
+                <div class="toggle-thumb"></div>
+              </div>
+            </div>
+
+            <!-- Guidance Style -->
+            <div class="flex flex-col gap-3 p-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[24px]">tune</span>
+                  <span class="font-label-lg text-label-lg font-semibold text-on-surface">Guidance Style</span>
+                </div>
+                <span class="font-body-sm text-body-sm text-on-surface-variant">Detail mode</span>
+              </div>
+              <div aria-label="Guidance Style Level" class="grid grid-cols-2 gap-2 bg-surface-container-lowest p-1.5 rounded-full" role="radiogroup">
+                <button aria-checked="true" class="detail-btn flex items-center justify-center min-h-[44px] rounded-full bg-primary-container text-on-primary font-label-md text-label-md font-bold shadow-md transition-all gap-1.5" role="radio" type="button">
+                  <span aria-hidden="true" class="material-symbols-outlined text-[18px]">bolt</span>
+                  <span>Concise</span>
+                </button>
+                <button aria-checked="false" class="detail-btn flex items-center justify-center min-h-[44px] rounded-full text-on-surface-variant font-label-md text-label-md hover:text-on-surface transition-all gap-1.5" role="radio" type="button">
+                  <span aria-hidden="true" class="material-symbols-outlined text-[18px]">menu_book</span>
+                  <span>Descriptive</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- High Contrast -->
+            <div class="flex items-center justify-between min-h-[64px] p-4 cursor-pointer select-none transition-colors hover:bg-surface-container-high" role="switch" aria-checked="true" tabindex="0" id="toggle-contrast-row">
+              <div class="flex items-center gap-3 pr-4">
+                <span aria-hidden="true" class="material-symbols-outlined text-primary-container text-[24px]">contrast</span>
+                <div class="flex flex-col">
+                  <span class="font-label-lg text-label-lg font-semibold text-on-surface">Accessibility</span>
+                  <span class="font-body-sm text-body-sm text-on-surface-variant">High contrast mode</span>
+                </div>
+              </div>
+              <div class="toggle-track active" id="toggle-contrast">
+                <div class="toggle-thumb"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Test Feedback -->
+          <div class="pt-3 flex flex-col gap-2">
+            <button aria-live="polite" class="w-full min-h-[56px] rounded-full bg-primary-container text-on-primary font-headline-sm text-headline-sm font-bold flex items-center justify-center gap-gap-xs shadow-lg transition-transform active:scale-[0.98] hover:bg-primary-fixed-dim focus:outline-none" id="btn-test-feedback" type="button">
+              <span aria-hidden="true" class="material-symbols-outlined text-[24px]">sensors</span>
+              <span id="btn-test-text">Test Feedback</span>
+            </button>
+            <p class="font-label-sm text-label-sm text-center text-on-surface-variant">Plays sample chime and haptic pulse</p>
+          </div>
+        </div>
+      </main>
+    </section>
+
+    <!-- ========================================
+         BOTTOM NAVIGATION
+         Shared across Home, Space, Settings
+         ======================================== -->
+    <nav aria-label="Primary Navigation" class="fixed bottom-0 w-full max-w-[430px] left-1/2 -translate-x-1/2 z-50 pb-safe bg-surface-container-low/95 backdrop-blur-xl border-t border-surface-container-high/40" id="bottom-nav">
+      <div class="flex justify-around items-center h-20 px-gutter-mobile">
+        <button aria-label="Find - Voice Guided Search" aria-current="page" class="nav-tab flex flex-col items-center justify-center w-touch-min min-h-[48px] h-touch-min rounded-full transition-colors gap-1 text-primary-container font-label-md font-bold" data-tab="home" type="button" id="nav-find">
+          <span aria-hidden="true" class="material-symbols-outlined text-[26px]">mic</span>
+          <span class="font-label-sm text-label-sm tracking-wide">Find</span>
+        </button>
+        <button aria-label="Space - Spatial Radar and Orientation" class="nav-tab flex flex-col items-center justify-center w-touch-min min-h-[48px] h-touch-min rounded-full text-on-surface-variant hover:text-on-surface transition-colors gap-1" data-tab="space" type="button" id="nav-space">
+          <span aria-hidden="true" class="material-symbols-outlined text-[26px]">layers</span>
+          <span class="font-label-sm text-label-sm tracking-wide">Space</span>
+        </button>
+        <button aria-label="More - Assistive Preferences and Sound Tuning" class="nav-tab flex flex-col items-center justify-center w-touch-min min-h-[48px] h-touch-min rounded-full text-on-surface-variant hover:text-on-surface transition-colors gap-1" data-tab="settings" type="button" id="nav-more">
+          <span aria-hidden="true" class="material-symbols-outlined text-[26px]">tune</span>
+          <span class="font-label-sm text-label-sm tracking-wide">More</span>
+        </button>
+      </div>
+    </nav>
+
+  </div><!-- end #app-shell -->
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
