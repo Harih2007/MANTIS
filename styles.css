@@ -345,3 +345,81 @@ a:focus-visible {
 .direction-animate {
   animation: direction-change 0.3s ease-out;
 }
+
+/* === Model Loading Overlay === */
+.model-loading-overlay {
+  position: fixed;
+  inset: 0;
+  max-width: 430px;
+  margin: 0 auto;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 20, 22, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 2rem;
+}
+
+.model-loading-overlay.hidden {
+  display: none;
+}
+
+.model-progress-bar {
+  width: 100%;
+  max-width: 280px;
+  height: 6px;
+  background: #282a2c;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 1.5rem;
+}
+
+.model-progress-fill {
+  height: 100%;
+  background: #fbbf24;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
+/* === Live Bounding Box (real-time detection) === */
+.live-bbox {
+  position: absolute;
+  pointer-events: none;
+  z-index: 25;
+  border: 2px solid #fbbf24;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.08);
+  transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+}
+
+.live-bbox-label {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  padding: 2px 10px;
+  border-radius: 4px;
+  background: #fbbf24;
+  color: #402d00;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* === Detection Pulse Indicator === */
+@keyframes detection-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.detection-active {
+  animation: detection-pulse 1.5s ease-in-out infinite;
+}

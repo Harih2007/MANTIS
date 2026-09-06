@@ -330,7 +330,7 @@
          SCREEN 4: LIVE CAMERA SEARCH
          From: 4._live_camera_search/code.html
          ======================================== -->
-    <section id="screen-searching" class="screen screen-immersive" role="main" aria-label="Searching for your backpack with camera">
+    <section id="screen-searching" class="screen screen-immersive" role="main" aria-label="Searching with camera">
       <!-- Camera Feed / Fallback -->
       <video id="camera-video" class="camera-feed" autoplay playsinline muted aria-label="Live camera view"></video>
       <div id="camera-fallback-bg" class="camera-fallback" role="img" aria-label="Camera view placeholder" style="background-image: url('https://lh3.googleusercontent.com/aida/AEtjO1V3RBwH1A_ItSUPzMiRRitIUXHiQwbevrje5X-nN8Ff3kha0I5jEIKJ8PjfJt8sUU1O2PCO24WQwJ90V9Lut3jdF-oEOeU9wwZdi011ulyLJDG-dfKNaVwGIYL34CeLUzA59m9fcRdr1BsrehQVYJwtVJ7tSCuvIt850R4CkWSpr5n6yuatYLSuHvhuLXuC-q6jSnRawVXkn-5bJJ3qlQtGqbp4tlPI4774mWG-1y1ZczLjE3Mnv5y231Q'); display:none;"></div>
@@ -350,20 +350,26 @@
             <div class="w-px h-3 bg-white/20"></div>
             <div class="flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
-              <span class="font-label-sm text-label-sm tracking-wide text-on-surface" id="search-status-text">Finding backpack</span>
+              <span class="font-label-sm text-label-sm tracking-wide text-on-surface" id="search-status-text">Searching...</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Bounding Box (initially hidden) -->
-      <div class="absolute z-20 pointer-events-none flex flex-col items-start" style="left: 67%; top: 48%; width: 28%; height: 36%; display:none;" id="search-bounding-box">
-        <div class="relative w-full h-full bbox-animate">
-          <div class="absolute -top-7 left-0 px-2.5 py-0.5 rounded bg-primary-container text-on-primary shadow-md">
-            <span class="font-label-sm text-[11px] font-bold tracking-wider">BACKPACK</span>
-          </div>
-          <div class="w-full h-full border-2 border-primary-container rounded-sm bg-primary-container/10"></div>
+      <!-- Live Bounding Box (positioned dynamically by ObjectSearchEngine) -->
+      <div class="live-bbox" id="live-bounding-box" style="display:none;">
+        <span class="live-bbox-label" id="live-bbox-label"></span>
+      </div>
+
+      <!-- Model Loading Overlay (shown during first model download) -->
+      <div class="model-loading-overlay hidden" id="model-loading-overlay">
+        <span class="material-symbols-outlined text-primary-container text-[48px] mb-4 detection-active">visibility</span>
+        <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface text-center">Loading Vision</h2>
+        <p class="font-body-sm text-body-sm text-on-surface-variant text-center mt-1" id="model-loading-status">Preparing AI model...</p>
+        <div class="model-progress-bar">
+          <div class="model-progress-fill" id="model-progress-fill" style="width: 0%;"></div>
         </div>
+        <p class="font-label-sm text-label-sm text-on-surface-variant text-center mt-3 opacity-60" id="model-loading-detail">First time setup</p>
       </div>
 
       <!-- Cancel Button -->
@@ -415,21 +421,21 @@
                 <span>FOUND</span>
               </div>
               <div class="font-headline-md text-headline-sm font-extrabold tracking-tight text-on-surface flex items-center gap-1.5 text-right">
-                <span>TO YOUR RIGHT</span>
-                <span aria-hidden="true" class="text-primary-container font-black">→</span>
+                <span id="found-direction-text">TO YOUR RIGHT</span>
+                <span aria-hidden="true" class="text-primary-container font-black" id="found-direction-arrow">→</span>
               </div>
             </div>
             <div class="flex items-center gap-2 pt-1 border-t border-white/10 text-on-surface">
               <span aria-hidden="true" class="material-symbols-outlined text-[20px] text-primary-container shrink-0">record_voice_over</span>
-              <p class="font-body-md text-body-md font-medium">"Your backpack is to your right."</p>
+              <p class="font-body-md text-body-md font-medium" id="found-spoken-text">"Your backpack is to your right."</p>
             </div>
           </div>
         </div>
 
-        <!-- Bounding Box on Backpack -->
-        <div class="absolute right-[10%] bottom-[24%] w-[38%] h-[38%] pointer-events-none z-10">
+        <!-- Bounding Box on Object -->
+        <div class="absolute right-[10%] bottom-[24%] w-[38%] h-[38%] pointer-events-none z-10" id="found-bbox-container">
           <div class="w-full h-full rounded-DEFAULT border-2 border-primary-container bg-primary-container/10 shadow-[0_0_12px_rgba(251,191,36,0.35)] bbox-animate">
-            <div class="absolute -top-3.5 left-2 bg-primary-container text-on-primary-container text-label-sm font-bold px-2 py-0.5 rounded-full shadow-sm">
+            <div class="absolute -top-3.5 left-2 bg-primary-container text-on-primary-container text-label-sm font-bold px-2 py-0.5 rounded-full shadow-sm" id="found-bbox-label">
               BACKPACK
             </div>
           </div>
@@ -512,7 +518,7 @@
         <div class="flex flex-col items-center text-center gap-6 mb-4">
           <div class="flex flex-col items-center gap-2">
             <h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold tracking-tight text-on-surface">OBJECT REACHED</h1>
-            <p class="font-body-lg text-body-lg text-on-surface-variant">"Your backpack is here."</p>
+            <p class="font-body-lg text-body-lg text-on-surface-variant" id="reached-message">"Your backpack is here."</p>
           </div>
           <button class="w-full h-14 rounded-full bg-primary-container text-on-primary font-headline-sm text-label-lg font-bold flex items-center justify-center shadow-lg active:scale-[0.98] transition-all cursor-pointer min-h-[56px]" id="reached-done-btn" type="button">DONE</button>
         </div>
@@ -818,6 +824,8 @@
 
   </div><!-- end #app-shell -->
 
+  <!-- ObjectSearchEngine (must load before app.js) -->
+  <script src="object-search.js"></script>
   <!-- Application Logic -->
   <script src="app.js"></script>
 </body>
