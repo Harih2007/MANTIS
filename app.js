@@ -398,7 +398,7 @@
   }
 
   // ==========================================
-  // SEARCHING SCREEN — REAL DETECTION + FALLBACK
+  // SEARCHING SCREEN — REAL DETECTION
   // ==========================================
 
   function setupSearchingScreen() {
@@ -419,52 +419,8 @@
     const targetName = currentSearchTarget ? currentSearchTarget.target : 'headphones';
     if (statusText) statusText.textContent = `Finding ${targetName}`;
 
-    let searchCompleted = false;
-
-    // Helper to confirm target found immediately
-    function confirmFound(direction = 'right') {
-      if (searchCompleted || currentScreen !== 'searching') return;
-      searchCompleted = true;
-
-      searchTimers.forEach(t => clearTimeout(t));
-      searchTimers = [];
-
-      if (searchEngine && typeof searchEngine.forceFound === 'function') {
-        searchEngine.forceFound(direction);
-      } else {
-        handleDetectionState({
-          state: 'found',
-          direction,
-          target: targetName,
-          box: { x: 0.52, y: 0.36, width: 0.30, height: 0.36 },
-          confidence: 0.92
-        });
-      }
-    }
-
-    // Tap-to-detect: user can tap the camera screen at any time to instantly lock-on!
-    const searchingSection = document.getElementById('screen-searching');
-    if (searchingSection) {
-      const tapHandler = (e) => {
-        if (e.target.closest('#searching-cancel')) return;
-        confirmFound('right');
-      };
-      searchingSection.removeEventListener('click', searchingSection._mantisTapHandler);
-      searchingSection._mantisTapHandler = tapHandler;
-      searchingSection.addEventListener('click', tapHandler);
-    }
-
-    // Safety fallback timeout:
-    // Guarantee that within 3.2s, the target is confirmed and the user progresses smoothly
-    const fallbackTimer = setTimeout(() => {
-      if (currentScreen === 'searching' && !searchCompleted) {
-        console.log('[MANTIS] Search window elapsed — confirming object:', targetName);
-        confirmFound('right');
-      }
-    }, 3200);
-    searchTimers.push(fallbackTimer);
-
-    // Try real detection
+    // Start real detection engine ONLY. Zero fake timers. Zero tap-to-detect.
+    // If target is not detected: remain in SEARCHING.
     if (useRealDetection && typeof ObjectSearchEngine !== 'undefined') {
       startDetectionEngine();
     }
@@ -493,13 +449,13 @@
               ? `Downloading AI model... ${info.progress || 0}%`
               : 'Loading model...';
           }
-          if (detailEl && info.file) {
-            detailEl.textContent = info.file;
+          if (detailEl) {
+            detailEl.textContent = info.file ? `${info.file} (${info.device || 'WASM'})` : `Runtime: ${info.device || 'WASM'}`;
           }
         } else if (info.status === 'ready') {
           if (overlay) overlay.classList.add('hidden');
         } else if (info.status === 'error') {
-          console.warn('[MANTIS] Vision model failed or slow:', info.error);
+          console.warn('[MANTIS] Vision model failed:', info.error);
           if (overlay) overlay.classList.add('hidden');
         }
       });
@@ -536,14 +492,24 @@
       case 'searching':
         if (currentScreen === 'searching') {
           const statusText = document.getElementById('search-status-text');
+          const scanLine = document.getElementById('search-scan-line');
           if (statusText) {
-            statusText.textContent = data.detectionHint
-              ? `Analyzing... ${targetName}`
-              : `Finding ${targetName}`;
+            if (data.isCandidate && data.candidateCount > 0) {
+              const capTarget = targetName.charAt(0).toUpperCase() + targetName.slice(1);
+              statusText.textContent = `Analyzing ${capTarget} (${data.candidateCount}/${data.stableTarget || 3})`;
+            } else {
+              statusText.textContent = `Finding ${targetName}`;
+            }
           }
-          // Hide bounding box while searching
-          const liveBbox = document.getElementById('live-bounding-box');
-          if (liveBbox && !data.detectionHint) liveBbox.style.display = 'none';
+          if (scanLine) scanLine.style.display = '';
+
+          // Show candidate bounding box if candidate frame
+          if (data.box && data.isCandidate) {
+            updateLiveBoundingBox(data.box, targetName);
+          } else {
+            const liveBbox = document.getElementById('live-bounding-box');
+            if (liveBbox) liveBbox.style.display = 'none';
+          }
         }
         break;
 
@@ -553,7 +519,7 @@
           const scanLine = document.getElementById('search-scan-line');
           if (scanLine) scanLine.style.display = 'none';
 
-          // Show live bounding box
+          // Show live bounding box with real model coordinates
           updateLiveBoundingBox(data.box, targetName);
 
           const statusText = document.getElementById('search-status-text');
@@ -563,13 +529,13 @@
           }
           announce(`${targetName} detected.`);
 
-          // Transition to Found screen after brief moment
+          // Transition to Found screen after brief moment to show lock-on
           const t = setTimeout(() => {
             if (currentScreen === 'searching') {
               updateFoundScreen(data);
               showScreen('found');
             }
-          }, 1200);
+          }, 1000);
           searchTimers.push(t);
         }
         break;
@@ -581,7 +547,7 @@
         break;
 
       case 'reached':
-        if (currentScreen === 'guidance') {
+        if (currentScreen === 'guidance' || currentScreen === 'found') {
           showScreen('reached');
         }
         break;
@@ -594,6 +560,13 @@
           if (pillEl) pillEl.textContent = 'SEARCHING';
           if (instrEl) instrEl.textContent = `"I lost the ${targetName}. Move slowly."`;
           announce(`I lost the ${targetName}. Move slowly.`);
+        } else if (currentScreen === 'searching') {
+          const liveBbox = document.getElementById('live-bounding-box');
+          if (liveBbox) liveBbox.style.display = 'none';
+          const scanLine = document.getElementById('search-scan-line');
+          if (scanLine) scanLine.style.display = '';
+          const statusText = document.getElementById('search-status-text');
+          if (statusText) statusText.textContent = `Finding ${targetName}`;
         }
         break;
     }
@@ -658,6 +631,18 @@
     if (foundBboxLabel) {
       foundBboxLabel.textContent = targetName.toUpperCase();
     }
+
+    // Update bounding box container with REAL model coordinates
+    const foundBboxContainer = document.getElementById('found-bbox-container');
+    if (foundBboxContainer && data.box) {
+      foundBboxContainer.style.left = `${(data.box.x * 100).toFixed(1)}%`;
+      foundBboxContainer.style.top = `${(data.box.y * 100).toFixed(1)}%`;
+      foundBboxContainer.style.width = `${(data.box.width * 100).toFixed(1)}%`;
+      foundBboxContainer.style.height = `${(data.box.height * 100).toFixed(1)}%`;
+      foundBboxContainer.style.right = 'auto';
+      foundBboxContainer.style.bottom = 'auto';
+      foundBboxContainer.style.display = '';
+    }
   }
 
   // ==========================================
@@ -690,8 +675,9 @@
     if (pauseText) pauseText.textContent = 'Pause Guidance';
     if (pauseIcon) pauseIcon.textContent = 'pause_circle';
 
-    // Run progressive guidance sequence
-    runDemoFallbackGuidance(targetName);
+    // Set initial guidance state from real detection engine state
+    const initialDir = (engineDetectionState && engineDetectionState.direction) || 'center';
+    updateGuidanceUI(initialDir, targetName);
   }
 
   function updateGuidanceFromDetection(data) {
@@ -757,91 +743,6 @@
         instrCard.classList.add('direction-animate');
       }
     }, 200);
-  }
-
-  // ==========================================
-  // DEMO FALLBACK (when model unavailable)
-  // ==========================================
-
-  function runDemoFallbackSearch() {
-    const targetName = currentSearchTarget ? currentSearchTarget.target : 'object';
-    const statusText = document.getElementById('search-status-text');
-    const scanLine = document.getElementById('search-scan-line');
-    const liveBbox = document.getElementById('live-bounding-box');
-    const liveBboxLabel = document.getElementById('live-bbox-label');
-
-    if (liveBbox) liveBbox.style.display = 'none';
-    if (scanLine) scanLine.style.display = '';
-    if (statusText) statusText.textContent = `Finding ${targetName}`;
-
-    // After 2.5s: show bounding box, update status
-    const t1 = setTimeout(() => {
-      if (currentScreen !== 'searching') return;
-
-      // Show a demo bounding box
-      if (liveBbox) {
-        liveBbox.style.display = '';
-        liveBbox.style.left = '55%';
-        liveBbox.style.top = '40%';
-        liveBbox.style.width = '28%';
-        liveBbox.style.height = '36%';
-      }
-      if (liveBboxLabel) liveBboxLabel.textContent = targetName.toUpperCase();
-      if (scanLine) scanLine.style.display = 'none';
-      if (statusText) {
-        const capTarget = targetName.charAt(0).toUpperCase() + targetName.slice(1);
-        statusText.textContent = `${capTarget} detected`;
-      }
-      announce(`${targetName} detected.`);
-
-      // After 1.5s more: transition to found
-      const t2 = setTimeout(() => {
-        if (currentScreen === 'searching') {
-          updateFoundScreen({ direction: 'right' });
-          showScreen('found');
-        }
-      }, 1500);
-      searchTimers.push(t2);
-    }, 2500);
-    searchTimers.push(t1);
-  }
-
-  function runDemoFallbackGuidance(targetName) {
-    const pillEl = document.getElementById('guidance-direction-text');
-    const instrEl = document.getElementById('guidance-instruction-text');
-    const pillContainer = document.getElementById('guidance-direction-pill');
-    const instrCard = document.getElementById('guidance-instruction-card');
-
-    // Step 1: MOVE RIGHT (initial)
-    setGuidanceState(pillEl, instrEl, 'MOVE RIGHT', `"Your ${targetName} is to the right.\nTurn right slowly."`);
-
-    // Step 2: YOU'RE LINED UP (after 3s)
-    const t1 = setTimeout(() => {
-      if (currentScreen !== 'guidance') return;
-      animateGuidanceChange(pillContainer, instrCard, () => {
-        setGuidanceState(pillEl, instrEl, "YOU'RE LINED UP", `"Your ${targetName} is ahead.\nWalk slowly forward."`);
-      });
-      announce("You're lined up. Walk slowly forward.");
-    }, 3000);
-    guidanceTimers.push(t1);
-
-    // Step 3: ALMOST THERE (after 6s)
-    const t2 = setTimeout(() => {
-      if (currentScreen !== 'guidance') return;
-      animateGuidanceChange(pillContainer, instrCard, () => {
-        setGuidanceState(pillEl, instrEl, 'ALMOST THERE', '"Just a few more steps.\nYou\'re very close."');
-      });
-      announce("Almost there. Just a few more steps.");
-    }, 6000);
-    guidanceTimers.push(t2);
-
-    // Step 4: Transition to REACHED (after 9s)
-    const t3 = setTimeout(() => {
-      if (currentScreen === 'guidance') {
-        showScreen('reached');
-      }
-    }, 9000);
-    guidanceTimers.push(t3);
   }
 
   // ==========================================
@@ -1035,6 +936,11 @@
           showScreen('home');
         }
       }
+      // Toggle developer debug overlay: Ctrl+Shift+D or backtick
+      if ((e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') || (e.key === '`' && e.target.tagName !== 'INPUT')) {
+        e.preventDefault();
+        toggleDebugMode();
+      }
     });
 
     // --- DEBUG MODE (triple-tap MANTIS header) ---
@@ -1051,10 +957,19 @@
         }
       });
     });
+
+    // Auto-open debug mode if query param present (e.g. ?debug=1 or ?dev=1)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('debug') || urlParams.has('dev')) {
+        setTimeout(() => toggleDebugMode(), 500);
+      }
+    } catch (e) {}
   }
 
   // ==========================================
-  // DEBUG MODE
+  // DEVELOPER-ONLY DEBUG HUD
+  // Never visible in normal MANTIS mode.
   // ==========================================
   let debugOverlay = null;
 
@@ -1066,29 +981,308 @@
       return;
     }
 
-    // Create debug overlay
+    // Ensure searchEngine exists
+    if (!searchEngine && typeof ObjectSearchEngine !== 'undefined') {
+      searchEngine = new ObjectSearchEngine();
+      searchEngine.onStateChange((data) => handleDetectionState(data));
+    }
+
+    // Create debug overlay container
     debugOverlay = document.createElement('div');
-    debugOverlay.id = 'debug-overlay';
-    debugOverlay.style.cssText = 'position:fixed;bottom:90px;left:8px;right:8px;max-width:414px;margin:0 auto;z-index:999;background:rgba(0,0,0,0.85);color:#4ae176;font-family:monospace;font-size:11px;padding:8px 12px;border-radius:8px;border:1px solid #333;pointer-events:none;max-height:200px;overflow-y:auto;';
-    debugOverlay.innerHTML = '<div id="debug-content">Debug mode active. Waiting for detections...</div>';
+    debugOverlay.id = 'mantis-debug-hud';
+    debugOverlay.style.cssText = `
+      position: fixed;
+      top: 12px;
+      left: 8px;
+      right: 8px;
+      max-width: 414px;
+      margin: 0 auto;
+      z-index: 99999;
+      background: rgba(12, 14, 16, 0.94);
+      color: #e2e2e5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      pointer-events: auto;
+      max-height: 85vh;
+      overflow-y: auto;
+    `;
+
+    debugOverlay.innerHTML = `
+      <!-- Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#4ae176;"></span>
+          <strong style="color:#fbbf24; font-size:11px; letter-spacing:0.05em;">MANTIS CV VALIDATION HUD</strong>
+          <span id="dbg-device-badge" style="padding:1px 5px; border-radius:4px; background:#1e2022; color:#d3c5ac; font-size:9px; font-weight:700;">${(searchEngine && searchEngine.activeDevice ? searchEngine.activeDevice.toUpperCase() : 'WASM')}</span>
+        </div>
+        <button id="dbg-close-btn" style="background:transparent; border:none; color:#9c8f79; font-size:14px; cursor:pointer; padding:0 4px; line-height:1;">✕</button>
+      </div>
+
+      <!-- Live CV Metrics Grid -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:8px; background:rgba(0,0,0,0.4); padding:8px; border-radius:8px;">
+        <div>
+          <span style="color:#9c8f79;">Target:</span> <span id="dbg-target" style="color:#ffe1a7; font-weight:700;">-</span>
+        </div>
+        <div>
+          <span style="color:#9c8f79;">Detected:</span> <span id="dbg-detected" style="color:#4ae176; font-weight:700;">-</span>
+        </div>
+        <div>
+          <span style="color:#9c8f79;">Direction:</span> <span id="dbg-direction" style="color:#fbbf24; font-weight:700;">-</span>
+        </div>
+        <div>
+          <span style="color:#9c8f79;">Stability:</span> <span id="dbg-stability" style="color:#e2e2e5; font-weight:700;">0 / 3</span>
+        </div>
+        <div>
+          <span style="color:#9c8f79;">Latency:</span> <span id="dbg-latency" style="color:#e2e2e5;">0 ms</span>
+        </div>
+        <div>
+          <span style="color:#9c8f79;">Rate:</span> <span id="dbg-fps" style="color:#e2e2e5;">0 inf/s</span>
+        </div>
+        <div style="grid-column: span 2;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+            <span style="color:#9c8f79;">Confidence:</span>
+            <span id="dbg-conf-val" style="color:#4ae176; font-weight:700;">0.000</span>
+          </div>
+          <div style="width:100%; height:5px; background:#282a2c; border-radius:3px; overflow:hidden;">
+            <div id="dbg-conf-bar" style="width:0%; height:100%; background:#4ae176; transition:width 0.2s;"></div>
+          </div>
+        </div>
+        <div style="grid-column: span 2; font-size:10px; color:#9c8f79;">
+          Box: <span id="dbg-box" style="color:#d3c5ac;">[none]</span>
+        </div>
+      </div>
+
+      <!-- Threshold Testing Controls -->
+      <div style="margin-bottom:8px; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+          <span style="color:#9c8f79; font-size:10px; font-weight:700; text-transform:uppercase;">Confidence Threshold Test</span>
+          <span id="dbg-current-thresh" style="color:#fbbf24; font-weight:700;">${searchEngine ? searchEngine.confidenceThreshold.toFixed(2) : '0.12'}</span>
+        </div>
+        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+          ${[0.05, 0.10, 0.15, 0.20, 0.25].map(th => `
+            <button class="dbg-th-btn" data-thresh="${th}" style="
+              flex: 1;
+              min-width: 48px;
+              padding: 4px 6px;
+              border-radius: 6px;
+              border: 1px solid rgba(255,255,255,0.15);
+              background: ${(searchEngine && Math.abs(searchEngine.confidenceThreshold - th) < 0.01) ? '#fbbf24' : '#1e2022'};
+              color: ${(searchEngine && Math.abs(searchEngine.confidenceThreshold - th) < 0.01) ? '#402d00' : '#e2e2e5'};
+              font-weight: 700;
+              font-size: 10px;
+              cursor: pointer;
+            ">${th.toFixed(2)}</button>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Stability Count Controls -->
+      <div style="margin-bottom:8px; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+          <span style="color:#9c8f79; font-size:10px; font-weight:700; text-transform:uppercase;">Consecutive Cycles (Stability)</span>
+          <span id="dbg-current-stable-count" style="color:#fbbf24; font-weight:700;">${searchEngine ? searchEngine.stableDetectionCount : 3} frames</span>
+        </div>
+        <div style="display:flex; gap:4px;">
+          ${[2, 3, 4, 5].map(cnt => `
+            <button class="dbg-sc-btn" data-count="${cnt}" style="
+              flex: 1;
+              padding: 4px 6px;
+              border-radius: 6px;
+              border: 1px solid rgba(255,255,255,0.15);
+              background: ${(searchEngine && searchEngine.stableDetectionCount === cnt) ? '#fbbf24' : '#1e2022'};
+              color: ${(searchEngine && searchEngine.stableDetectionCount === cnt) ? '#402d00' : '#e2e2e5'};
+              font-weight: 700;
+              font-size: 10px;
+              cursor: pointer;
+            ">${cnt} cycles</button>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Runtime Benchmark Selector (WASM vs WebGPU) -->
+      <div style="margin-bottom:8px; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+          <span style="color:#9c8f79; font-size:10px; font-weight:700; text-transform:uppercase;">Execution Runtime</span>
+          <span id="dbg-runtime-active" style="color:#4ae176; font-weight:700;">${(searchEngine && searchEngine.activeDevice ? searchEngine.activeDevice.toUpperCase() : 'WASM')}</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button id="dbg-rt-wasm" style="flex:1; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:#1e2022; color:#e2e2e5; font-size:10px; font-weight:700; cursor:pointer;">
+            Force WASM
+          </button>
+          <button id="dbg-rt-webgpu" style="flex:1; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:#1e2022; color:#e2e2e5; font-size:10px; font-weight:700; cursor:pointer;">
+            Try WebGPU
+          </button>
+        </div>
+      </div>
+
+      <!-- Test Object Switcher (Open-Vocabulary Testing) -->
+      <div style="background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+        <span style="color:#9c8f79; font-size:10px; font-weight:700; text-transform:uppercase; display:block; margin-bottom:5px;">Open-Vocabulary Target Test</span>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; max-height:80px; overflow-y:auto;">
+          ${['backpack', 'headphones', 'wallet', 'earbuds', 'phone', 'water bottle', 'book', 'cup', 'remote', 'keys', 'glasses', 'laptop', 'chair'].map(tgt => `
+            <button class="dbg-target-btn" data-target="${tgt}" style="
+              padding: 2px 7px;
+              border-radius: 9999px;
+              border: 1px solid rgba(251,191,36,0.3);
+              background: #1e2022;
+              color: #ffe1a7;
+              font-size: 10px;
+              cursor: pointer;
+            ">${tgt}</button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
     document.body.appendChild(debugOverlay);
 
+    // Event: Close Button
+    const closeBtn = document.getElementById('dbg-close-btn');
+    if (closeBtn) closeBtn.addEventListener('click', () => toggleDebugMode());
+
+    // Event: Threshold Buttons
+    const threshBtns = debugOverlay.querySelectorAll('.dbg-th-btn');
+    threshBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseFloat(btn.dataset.thresh);
+        if (searchEngine) {
+          searchEngine.confidenceThreshold = val;
+          const currEl = document.getElementById('dbg-current-thresh');
+          if (currEl) currEl.textContent = val.toFixed(2);
+        }
+        threshBtns.forEach(b => {
+          b.style.background = '#1e2022';
+          b.style.color = '#e2e2e5';
+        });
+        btn.style.background = '#fbbf24';
+        btn.style.color = '#402d00';
+      });
+    });
+
+    // Event: Stability Count Buttons
+    const scBtns = debugOverlay.querySelectorAll('.dbg-sc-btn');
+    scBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseInt(btn.dataset.count, 10);
+        if (searchEngine) {
+          searchEngine.stableDetectionCount = val;
+          const currEl = document.getElementById('dbg-current-stable-count');
+          if (currEl) currEl.textContent = `${val} frames`;
+        }
+        scBtns.forEach(b => {
+          b.style.background = '#1e2022';
+          b.style.color = '#e2e2e5';
+        });
+        btn.style.background = '#fbbf24';
+        btn.style.color = '#402d00';
+      });
+    });
+
+    // Event: Runtime Buttons
+    const wasmBtn = document.getElementById('dbg-rt-wasm');
+    const webgpuBtn = document.getElementById('dbg-rt-webgpu');
+    if (wasmBtn) {
+      wasmBtn.addEventListener('click', () => {
+        if (searchEngine) {
+          searchEngine.setPreferredDevice('wasm');
+          document.getElementById('dbg-runtime-active').textContent = 'WASM (reloading...)';
+        }
+      });
+    }
+    if (webgpuBtn) {
+      webgpuBtn.addEventListener('click', () => {
+        if (searchEngine) {
+          searchEngine.setPreferredDevice('webgpu');
+          document.getElementById('dbg-runtime-active').textContent = 'WebGPU (testing...)';
+        }
+      });
+    }
+
+    // Event: Target Test Buttons
+    const targetBtns = debugOverlay.querySelectorAll('.dbg-target-btn');
+    targetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tgt = btn.dataset.target;
+        currentSearchTarget = { raw: `Find my ${tgt}`, target: tgt };
+        transitionToUnderstood(tgt, `Find my ${tgt}`);
+      });
+    });
+
+    // Connect real-time debug subscriber
     if (searchEngine) {
       searchEngine.debugMode = true;
       searchEngine.onDebug((data) => {
-        const el = document.getElementById('debug-content');
-        if (!el) return;
-        const lines = [
-          `target: "${data.target}"`,
-          `state: ${data.state}`,
-          `inference: ${data.inferenceTime}ms`,
-          `threshold: ${data.confidenceThreshold}`,
-          `detections: ${data.detections.length}`
-        ];
-        data.detections.forEach((d, i) => {
-          lines.push(`  [${i}] conf=${d.confidence.toFixed(3)} x=${d.x?.toFixed(2)} y=${d.y?.toFixed(2)} w=${d.width?.toFixed(2)} h=${d.height?.toFixed(2)}`);
-        });
-        el.textContent = lines.join('\n');
+        const targetEl = document.getElementById('dbg-target');
+        const detectedEl = document.getElementById('dbg-detected');
+        const dirEl = document.getElementById('dbg-direction');
+        const stabEl = document.getElementById('dbg-stability');
+        const latEl = document.getElementById('dbg-latency');
+        const fpsEl = document.getElementById('dbg-fps');
+        const confValEl = document.getElementById('dbg-conf-val');
+        const confBarEl = document.getElementById('dbg-conf-bar');
+        const boxEl = document.getElementById('dbg-box');
+        const devBadge = document.getElementById('dbg-device-badge');
+        const rtActive = document.getElementById('dbg-runtime-active');
+
+        if (targetEl) targetEl.textContent = data.target || '-';
+        if (devBadge && data.device) devBadge.textContent = data.device.toUpperCase();
+        if (rtActive && data.device) rtActive.textContent = data.device.toUpperCase();
+
+        if (latEl) latEl.textContent = `${data.inferenceTime} ms`;
+        if (fpsEl) fpsEl.textContent = `${data.inferenceFPS} inf/s`;
+        if (dirEl) dirEl.textContent = (data.direction || 'center').toUpperCase();
+
+        const stableTarget = data.stableDetectionCount || 3;
+        const currentCount = data.consecutiveDetections || 0;
+        const isStable = currentCount >= stableTarget;
+        if (stabEl) {
+          stabEl.textContent = `${currentCount} / ${stableTarget} ${isStable ? '(STABLE)' : (currentCount > 0 ? '(CANDIDATE)' : '')}`;
+          stabEl.style.color = isStable ? '#4ae176' : (currentCount > 0 ? '#fbbf24' : '#e2e2e5');
+        }
+
+        if (data.bestDetection) {
+          const conf = data.bestDetection.confidence || 0;
+          if (detectedEl) {
+            detectedEl.textContent = data.bestDetection.label || data.target || 'detected';
+            detectedEl.style.color = conf >= data.confidenceThreshold ? '#4ae176' : '#ffb4ab';
+          }
+          if (confValEl) {
+            confValEl.textContent = conf.toFixed(3);
+            confValEl.style.color = conf >= data.confidenceThreshold ? '#4ae176' : '#ffb4ab';
+          }
+          if (confBarEl) {
+            confBarEl.style.width = `${Math.min(100, Math.round(conf * 100))}%`;
+            confBarEl.style.background = conf >= data.confidenceThreshold ? '#4ae176' : '#ffb4ab';
+          }
+        } else {
+          if (detectedEl) {
+            detectedEl.textContent = 'none';
+            detectedEl.style.color = '#9c8f79';
+          }
+          if (confValEl) {
+            confValEl.textContent = '0.000';
+            confValEl.style.color = '#9c8f79';
+          }
+          if (confBarEl) {
+            confBarEl.style.width = '0%';
+          }
+        }
+
+        if (boxEl) {
+          if (data.smoothedBox) {
+            const b = data.smoothedBox;
+            boxEl.textContent = `x:${b.x.toFixed(2)} y:${b.y.toFixed(2)} w:${b.width.toFixed(2)} h:${b.height.toFixed(2)}`;
+          } else {
+            boxEl.textContent = '[none]';
+          }
+        }
       });
     }
   }

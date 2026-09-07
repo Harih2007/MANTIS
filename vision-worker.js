@@ -14,53 +14,91 @@ env.allowLocalModels = false;
 let detector = null;
 let isLoading = false;
 let isReady = false;
+let activeDevice = 'wasm';
 
 // ==========================================
 // MODEL INITIALIZATION
 // ==========================================
-async function initModel() {
-  if (isReady || isLoading) return;
+async function initModel(preferredDevice = 'wasm') {
+  if (isReady && activeDevice === preferredDevice) {
+    self.postMessage({ type: 'init-complete', device: activeDevice });
+    return;
+  }
+  if (isLoading) return;
   isLoading = true;
 
-  try {
-    self.postMessage({ type: 'init-progress', status: 'downloading', progress: 0 });
+  // If re-initializing with different device, dispose existing
+  if (detector) {
+    try { await detector.dispose(); } catch (e) { /* ignore */ }
+    detector = null;
+    isReady = false;
+  }
 
-    detector = await pipeline(
-      'zero-shot-object-detection',
-      'Xenova/owlvit-base-patch32',
-      {
-        // Use WebGPU if available, fall back to WASM
-        device: 'wasm',
-        progress_callback: (progress) => {
-          if (progress.status === 'progress' && progress.progress !== undefined) {
-            self.postMessage({
-              type: 'init-progress',
-              status: 'downloading',
-              progress: Math.round(progress.progress),
-              file: progress.file || ''
-            });
-          } else if (progress.status === 'done') {
-            self.postMessage({
-              type: 'init-progress',
-              status: 'loading',
-              progress: 95
-            });
+  // Attempt preferred device, fallback to wasm if webgpu fails
+  const devicesToTry = preferredDevice === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'];
+
+  for (const device of devicesToTry) {
+    try {
+      self.postMessage({
+        type: 'init-progress',
+        status: 'downloading',
+        progress: 0,
+        device
+      });
+
+      detector = await pipeline(
+        'zero-shot-object-detection',
+        'Xenova/owlvit-base-patch32',
+        {
+          device: device,
+          progress_callback: (progress) => {
+            if (progress.status === 'progress' && progress.progress !== undefined) {
+              self.postMessage({
+                type: 'init-progress',
+                status: 'downloading',
+                progress: Math.round(progress.progress),
+                file: progress.file || '',
+                device
+              });
+            } else if (progress.status === 'done') {
+              self.postMessage({
+                type: 'init-progress',
+                status: 'loading',
+                progress: 95,
+                device
+              });
+            }
           }
         }
+      );
+
+      activeDevice = device;
+      isReady = true;
+      isLoading = false;
+      self.postMessage({ type: 'init-complete', device: activeDevice });
+      return;
+
+    } catch (error) {
+      console.warn(`[VisionWorker] Device ${device} failed:`, error.message);
+      if (device === 'webgpu' && devicesToTry.includes('wasm')) {
+        self.postMessage({
+          type: 'init-progress',
+          status: 'warning',
+          message: 'WebGPU failed or unsupported. Falling back to WASM...',
+          progress: 10
+        });
+        continue;
       }
-    );
 
-    isReady = true;
-    isLoading = false;
-    self.postMessage({ type: 'init-complete' });
-
-  } catch (error) {
-    isLoading = false;
-    isReady = false;
-    self.postMessage({
-      type: 'init-error',
-      error: error.message || 'Failed to load vision model'
-    });
+      isLoading = false;
+      isReady = false;
+      self.postMessage({
+        type: 'init-error',
+        error: error.message || `Failed to load vision model on ${device}`,
+        device
+      });
+      return;
+    }
   }
 }
 
@@ -95,7 +133,7 @@ async function detect(imageData, targets, requestId) {
 
     // Run the zero-shot detection pipeline
     const results = await detector(blob, candidateLabels, {
-      threshold: 0.05, // Low threshold — we'll filter in ObjectSearchEngine
+      threshold: 0.02, // Low raw floor so candidate scores are passed for client-side thresholding
       percentage: true  // Return coordinates as percentages (0-1)
     });
 
@@ -120,6 +158,7 @@ async function detect(imageData, targets, requestId) {
       type: 'result',
       detections,
       inferenceTime,
+      device: activeDevice,
       id: requestId
     });
 
@@ -129,6 +168,7 @@ async function detect(imageData, targets, requestId) {
       type: 'result',
       detections: [],
       inferenceTime,
+      device: activeDevice,
       id: requestId,
       error: error.message || 'Inference failed'
     });
@@ -143,7 +183,7 @@ self.onmessage = async function (e) {
 
   switch (msg.type) {
     case 'init':
-      await initModel();
+      await initModel(msg.device || 'wasm');
       break;
 
     case 'detect':

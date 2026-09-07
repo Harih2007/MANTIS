@@ -1,8 +1,10 @@
 /* ============================================
    MANTIS — ObjectSearchEngine
-   Abstraction layer between UI and vision model.
-   Handles target extraction, frame capture,
-   temporal smoothing, direction, and TTS.
+   Real computer-vision search engine powered
+   by OWL-ViT and Transformers.js Web Worker.
+   Enforces temporal stability, real bounding boxes,
+   direction dead-zones with hysteresis, debounced TTS,
+   and configurable CV thresholds.
    ============================================ */
 
 class ObjectSearchEngine {
@@ -11,6 +13,8 @@ class ObjectSearchEngine {
     this.worker = null;
     this.workerReady = false;
     this.workerError = null;
+    this.preferredDevice = 'wasm'; // 'wasm' | 'webgpu'
+    this.activeDevice = 'wasm';
 
     // Search state
     this.isSearching = false;
@@ -19,52 +23,103 @@ class ObjectSearchEngine {
     this.rawRequest = '';
     this.requestId = 0;
     this.pendingInference = false;
+    this.searchStartTime = 0;
+    this.lastFailurePromptTime = 0;
 
-    // Adaptive frame capture
-    this.captureInterval = null;
-    this.inferenceRate = 2500; // ms between captures (adaptive)
-    this.minRate = 1500;
-    this.maxRate = 6000;
+    // Configurable Parameters (CV & Stability)
+    this._confidenceThreshold = 0.12;  // Tunable (0.05, 0.10, 0.15, 0.20, 0.25)
+    this._stableDetectionCount = 3;    // Consecutive candidate frames before FOUND
+    this._lostTargetGracePeriod = 4;   // Missed frames before declaring target LOST (~6-8s)
+    this._inferenceInterval = 1800;    // Adaptive ms between captures
+    this.minRate = 1200;
+    this.maxRate = 5000;
     this.lastInferenceTime = 0;
 
-    // Detection state
-    this.detectionBuffer = [];      // Last N detection results for temporal consistency
-    this.bufferSize = 3;            // Require this many consecutive detections
-    this.confidenceThreshold = 0.06; // Minimum confidence to consider
-    this.foundThreshold = 1;        // Consecutive detections needed to trigger FOUND
-    this.searchFallbackTimer = null; // Auto-confirm fallback timer
+    // Temporal detection tracking
+    this.consecutiveDetections = 0;
+    this.missedFrames = 0;
+    this.lostAnnounced = false;
+    this.state = 'idle'; // idle | loading | searching | found | guidance | reached | lost
 
-    // Bounding box smoothing (EMA)
+    // Bounding box smoothing (Exponential Moving Average)
     this.smoothedBox = null;
-    this.smoothingFactor = 0.4; // 0 = no smoothing, 1 = no change
+    this.smoothingFactor = 0.45; // Weight of existing smoothed state (0 = snap, 1 = freeze)
 
-    // Direction state
-    this.currentDirection = null;
+    // Direction state with dead-band and hysteresis
+    this.currentDirection = 'center';
     this.directionDeadZone = { left: 0.35, right: 0.65 };
+    this.hysteresisBuffer = 0.04;
     this.lastSpokenDirection = null;
     this.lastSpeakTime = 0;
-    this.speakCooldown = 3000; // ms between TTS announcements
-
-    // Object lost tracking
-    this.missedFrames = 0;
-    this.maxMissedFrames = 4; // Frames without detection before "lost"
-    this.lostAnnounced = false;
-
-    // State
-    this.state = 'idle'; // idle | loading | searching | found | guidance | lost
-    this.consecutiveDetections = 0;
+    this.speakCooldown = 3500; // ms between repeated TTS guidance
 
     // Callbacks
     this._onStateChange = null;
     this._onModelLoading = null;
     this._onDebug = null;
 
-    // Debug
+    // Debug Mode
     this.debugMode = false;
   }
 
   // ==========================================
-  // PUBLIC API
+  // CONFIGURABLE PARAMETERS ACCESSORS
+  // ==========================================
+
+  get confidenceThreshold() {
+    return this._confidenceThreshold;
+  }
+  set confidenceThreshold(val) {
+    const parsed = parseFloat(val);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+      this._confidenceThreshold = parsed;
+      console.log(`[ObjectSearchEngine] CONFIDENCE_THRESHOLD updated to ${this._confidenceThreshold}`);
+    }
+  }
+
+  get stableDetectionCount() {
+    return this._stableDetectionCount;
+  }
+  set stableDetectionCount(val) {
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      this._stableDetectionCount = parsed;
+      console.log(`[ObjectSearchEngine] STABLE_DETECTION_COUNT updated to ${this._stableDetectionCount}`);
+    }
+  }
+
+  get lostTargetGracePeriod() {
+    return this._lostTargetGracePeriod;
+  }
+  set lostTargetGracePeriod(val) {
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      this._lostTargetGracePeriod = parsed;
+      console.log(`[ObjectSearchEngine] LOST_TARGET_GRACE_PERIOD updated to ${this._lostTargetGracePeriod}`);
+    }
+  }
+
+  get inferenceInterval() {
+    return this._inferenceInterval;
+  }
+  set inferenceInterval(val) {
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed >= 500) {
+      this._inferenceInterval = parsed;
+    }
+  }
+
+  setPreferredDevice(device) {
+    if (device === 'wasm' || device === 'webgpu') {
+      this.preferredDevice = device;
+      if (this.worker) {
+        this.worker.postMessage({ type: 'init', device: this.preferredDevice });
+      }
+    }
+  }
+
+  // ==========================================
+  // PUBLIC API & CALLBACK REGISTRATION
   // ==========================================
 
   onStateChange(callback) {
@@ -86,18 +141,18 @@ class ObjectSearchEngine {
    * @returns {{ raw: string, target: string }}
    */
   static extractTarget(rawInput) {
-    let text = rawInput.toLowerCase().trim();
+    let text = (rawInput || '').toLowerCase().trim();
 
-    // Remove question marks, periods, exclamation
+    // Remove punctuation
     text = text.replace(/[?.!,]+$/g, '');
 
     // Remove common command prefixes
     const prefixes = [
       'can you find', 'could you find', 'please find', 'help me find',
-      'i need to find', 'i want to find', 'i\'m looking for',
-      'where is', 'where are', 'where\'s',
+      'i need to find', 'i want to find', 'i\'m looking for', 'im looking for',
+      'where is', 'where are', 'where\'s', 'wheres',
       'find me', 'look for', 'search for', 'locate',
-      'find'
+      'find', 'detect', 'spot', 'track'
     ];
     for (const prefix of prefixes) {
       if (text.startsWith(prefix)) {
@@ -106,15 +161,12 @@ class ObjectSearchEngine {
       }
     }
 
-    // Remove leading articles/possessives
+    // Remove leading articles / possessives
     text = text.replace(/^(my|the|a|an|those|these|that|this|some)\s+/i, '');
-
-    // Clean up extra whitespace
     text = text.replace(/\s+/g, ' ').trim();
 
-    // If nothing left, use original
     if (!text || text.length < 2) {
-      text = rawInput.trim();
+      text = (rawInput || '').trim();
     }
 
     return {
@@ -124,46 +176,62 @@ class ObjectSearchEngine {
   }
 
   /**
-   * Expand target query into rich synonyms for zero-shot object detection.
+   * Expand target query into zero-shot prompts and common synonyms.
+   * Open-vocabulary: works on ANY target string without a fixed list limit.
    * @param {string} target - The extracted target name
    * @returns {string[]} Candidate labels
    */
   static expandTargetQueries(target) {
     const t = (target || '').toLowerCase().trim();
+    if (!t) return ['object'];
+
+    // Known common synonym clusters for everyday objects
     const synonymMap = {
-      headphones: ['headphones', 'headset', 'earphones', 'earbuds', 'over-ear headphones', 'wireless headphones'],
       backpack: ['backpack', 'bag', 'rucksack', 'knapsack', 'schoolbag', 'bookbag'],
+      headphones: ['headphones', 'headset', 'earphones', 'over-ear headphones', 'wireless headphones'],
+      earbuds: ['earbuds', 'in-ear headphones', 'airpods', 'wireless earbuds'],
       wallet: ['wallet', 'purse', 'billfold', 'pocketbook', 'money clip'],
       'water bottle': ['water bottle', 'bottle', 'flask', 'thermos', 'drink bottle'],
-      bottle: ['bottle', 'water bottle', 'plastic bottle', 'flask'],
-      glasses: ['glasses', 'spectacles', 'sunglasses', 'eyeglasses', 'reading glasses'],
+      bottle: ['bottle', 'water bottle', 'plastic bottle', 'drink bottle', 'flask'],
+      phone: ['smartphone', 'cell phone', 'mobile phone', 'phone', 'iphone', 'android phone'],
       remote: ['remote control', 'tv remote', 'remote', 'controller'],
-      phone: ['cell phone', 'smartphone', 'mobile phone', 'phone', 'iphone'],
       keys: ['keys', 'keychain', 'car key', 'set of keys', 'key ring'],
+      glasses: ['glasses', 'spectacles', 'sunglasses', 'eyeglasses', 'reading glasses'],
+      laptop: ['laptop', 'notebook computer', 'laptop computer', 'computer'],
+      cup: ['cup', 'mug', 'coffee cup', 'tea cup', 'coffee mug'],
       chair: ['chair', 'armchair', 'seat', 'office chair'],
-      laptop: ['laptop', 'notebook computer', 'laptop computer'],
-      cup: ['cup', 'mug', 'coffee cup', 'tea cup'],
-      pen: ['pen', 'ballpoint pen', 'marker', 'pencil'],
-      book: ['book', 'novel', 'textbook', 'notebook'],
-      watch: ['wristwatch', 'watch', 'smartwatch', 'clock']
+      book: ['book', 'novel', 'textbook', 'notebook', 'paperback']
     };
 
+    // Check exact or partial synonym cluster match
+    let candidates = null;
     if (synonymMap[t]) {
-      return synonymMap[t];
-    }
-    for (const [key, list] of Object.entries(synonymMap)) {
-      if (t.includes(key) || key.includes(t)) {
-        return list;
+      candidates = [...synonymMap[t]];
+    } else {
+      for (const [key, list] of Object.entries(synonymMap)) {
+        if (t.includes(key) || key.includes(t)) {
+          candidates = [...list];
+          if (!candidates.includes(t)) candidates.unshift(t);
+          break;
+        }
       }
     }
-    return [target, `a ${target}`, `the ${target}`];
+
+    // Default open-vocabulary query set for any arbitrary object
+    if (!candidates) {
+      candidates = [t, `a ${t}`, `the ${t}`];
+    }
+
+    return candidates;
   }
 
-  /**
-   * Initialize the vision worker and start loading the model.
-   */
-  async initWorker() {
+  // ==========================================
+  // WORKER LIFECYCLE
+  // ==========================================
+
+  async initWorker(preferredDevice = null) {
     if (this.worker) return;
+    if (preferredDevice) this.preferredDevice = preferredDevice;
 
     try {
       this.worker = new Worker('vision-worker.js', { type: 'module' });
@@ -176,10 +244,9 @@ class ObjectSearchEngine {
         this._emitModelLoading({ status: 'error', progress: 0, error: this.workerError });
       };
 
-      // Request model init
       this.state = 'loading';
       this._emitModelLoading({ status: 'downloading', progress: 0 });
-      this.worker.postMessage({ type: 'init' });
+      this.worker.postMessage({ type: 'init', device: this.preferredDevice });
 
     } catch (err) {
       console.error('[ObjectSearchEngine] Failed to create worker:', err);
@@ -188,10 +255,15 @@ class ObjectSearchEngine {
     }
   }
 
+  // ==========================================
+  // SEARCH CONTROL
+  // ==========================================
+
   /**
    * Start searching for a target object using the camera.
+   * ZERO fake timers: will ONLY transition to found upon genuine CV model detection.
    * @param {HTMLVideoElement} videoElement - Camera video element
-   * @param {string} targetText - The object to find (already extracted)
+   * @param {string} targetText - The object to find
    */
   async startSearch(videoElement, targetText) {
     this.videoElement = videoElement;
@@ -202,67 +274,29 @@ class ObjectSearchEngine {
     this.missedFrames = 0;
     this.lostAnnounced = false;
     this.smoothedBox = null;
-    this.detectionBuffer = [];
+    this.currentDirection = 'center';
     this.lastSpokenDirection = null;
     this.pendingInference = false;
+    this.searchStartTime = Date.now();
+    this.lastFailurePromptTime = 0;
 
-    // Reset fallback timer
-    if (this.searchFallbackTimer) {
-      clearTimeout(this.searchFallbackTimer);
-      this.searchFallbackTimer = null;
-    }
+    // Initial voice prompt
+    this._speak(`Finding your ${this.currentTarget}.`);
 
-    // Auto-confirm fallback:
-    // If real vision model hasn't confirmed detection within 3.5s,
-    // trigger lock-on so user flow is never stalled
-    this.searchFallbackTimer = setTimeout(() => {
-      if (this.isSearching && (this.state === 'searching' || this.state === 'loading')) {
-        console.log('[ObjectSearchEngine] Search window reached — confirming target detection:', this.currentTarget);
-        this.forceFound('right');
-      }
-    }, 3500);
+    // Emit initial searching state
+    this._emitStateChange({
+      state: 'searching',
+      target: this.currentTarget,
+      consecutiveDetections: 0,
+      confidence: 0
+    });
 
-    // Init worker if not done
+    // Initialize worker if needed
     if (!this.worker) {
       await this.initWorker();
     } else if (this.workerReady) {
-      // Worker already ready, start capturing
       this._startCapture();
     }
-    // If worker is still loading, _handleWorkerMessage will call _startCapture on 'init-complete'
-  }
-
-  /**
-   * Instantly confirm and locate the target object.
-   * Useful for tap-to-detect and fallback triggers.
-   */
-  forceFound(direction = 'right') {
-    if (!this.isSearching) return;
-    if (this.searchFallbackTimer) {
-      clearTimeout(this.searchFallbackTimer);
-      this.searchFallbackTimer = null;
-    }
-
-    const box = {
-      x: direction === 'left' ? 0.15 : (direction === 'right' ? 0.52 : 0.35),
-      y: 0.35,
-      width: 0.30,
-      height: 0.36,
-      confidence: 0.92
-    };
-    this.smoothedBox = box;
-    this.currentDirection = direction;
-    this.state = 'found';
-    this.consecutiveDetections = 2;
-
-    this._emitStateChange({
-      state: 'found',
-      direction,
-      target: this.currentTarget,
-      box,
-      confidence: 0.92
-    });
-    this._speak(`Your ${this.currentTarget} is ${this._directionText(direction)}.`);
   }
 
   /**
@@ -271,15 +305,11 @@ class ObjectSearchEngine {
   stopSearch() {
     this.isSearching = false;
     this.state = 'idle';
-    if (this.searchFallbackTimer) {
-      clearTimeout(this.searchFallbackTimer);
-      this.searchFallbackTimer = null;
-    }
     this._stopCapture();
     this.smoothedBox = null;
-    this.detectionBuffer = [];
     this.consecutiveDetections = 0;
     this.missedFrames = 0;
+    this.pendingInference = false;
   }
 
   /**
@@ -295,16 +325,10 @@ class ObjectSearchEngine {
     }
   }
 
-  /**
-   * Check if the engine has a working model.
-   */
   isModelReady() {
     return this.workerReady && !this.workerError;
   }
 
-  /**
-   * Check if the engine has failed.
-   */
   hasError() {
     return !!this.workerError;
   }
@@ -319,15 +343,20 @@ class ObjectSearchEngine {
         this._emitModelLoading({
           status: msg.status,
           progress: msg.progress || 0,
-          file: msg.file || ''
+          file: msg.file || '',
+          device: msg.device || this.preferredDevice
         });
         break;
 
       case 'init-complete':
         this.workerReady = true;
         this.workerError = null;
-        this._emitModelLoading({ status: 'ready', progress: 100 });
-        // If a search was waiting for model, start it
+        this.activeDevice = msg.device || 'wasm';
+        this._emitModelLoading({
+          status: 'ready',
+          progress: 100,
+          device: this.activeDevice
+        });
         if (this.isSearching) {
           this._startCapture();
         }
@@ -353,15 +382,15 @@ class ObjectSearchEngine {
     this._stopCapture();
     if (!this.isSearching) return;
 
-    // Capture first frame immediately
+    // Capture first frame
     this._captureAndDetect();
 
-    // Then on interval
+    // Loop with adaptive interval
     this.captureInterval = setInterval(() => {
       if (this.isSearching && !this.pendingInference) {
         this._captureAndDetect();
       }
-    }, this.inferenceRate);
+    }, this._inferenceInterval);
   }
 
   _stopCapture() {
@@ -378,9 +407,9 @@ class ObjectSearchEngine {
     if (video.readyState < 2 || video.videoWidth === 0) return;
 
     try {
-      // Capture at reduced resolution for faster inference
+      // Capture at efficient 640px width for fast mobile inference
       const captureWidth = 640;
-      const captureHeight = Math.round((video.videoHeight / video.videoWidth) * captureWidth);
+      const captureHeight = Math.max(360, Math.round((video.videoHeight / video.videoWidth) * captureWidth));
 
       const canvas = document.createElement('canvas');
       canvas.width = captureWidth;
@@ -407,94 +436,98 @@ class ObjectSearchEngine {
 
   // ==========================================
   // DETECTION RESULT PROCESSING
+  // Genuine CV-driven logic only!
   // ==========================================
 
   _handleDetectionResult(msg) {
     this.pendingInference = false;
     if (!this.isSearching) return;
 
-    const { detections, inferenceTime, id, error } = msg;
+    const { detections, inferenceTime, device, id, error } = msg;
+    if (device) this.activeDevice = device;
 
-    // Adapt inference rate based on actual performance
+    // Adapt inference rate to device capability
     if (inferenceTime > 0) {
       this.lastInferenceTime = inferenceTime;
-      // Set interval to ~1.5x inference time, clamped
-      this.inferenceRate = Math.max(
+      const adaptedRate = Math.max(
         this.minRate,
-        Math.min(this.maxRate, Math.round(inferenceTime * 1.5))
+        Math.min(this.maxRate, Math.round(inferenceTime * 1.35))
       );
-      // Restart capture with new rate
-      if (this.isSearching && this.captureInterval) {
-        this._startCapture();
+      if (Math.abs(adaptedRate - this._inferenceInterval) > 300) {
+        this._inferenceInterval = adaptedRate;
+        if (this.isSearching && this.captureInterval) {
+          this._startCapture();
+        }
       }
     }
 
-    // Debug
-    if (this.debugMode && this._onDebug) {
+    // Filter detections by the active confidence threshold
+    const validDetections = (detections || []).filter(
+      d => d.confidence >= this._confidenceThreshold
+    );
+    validDetections.sort((a, b) => b.confidence - a.confidence);
+
+    const best = validDetections.length > 0 ? validDetections[0] : null;
+
+    // Send rich metrics to debug subscriber
+    if (this._onDebug) {
       this._onDebug({
         target: this.currentTarget,
-        detections,
-        inferenceTime,
-        confidenceThreshold: this.confidenceThreshold,
-        state: this.state
+        detections: detections || [],
+        bestDetection: best || (detections && detections[0]) || null,
+        confidenceThreshold: this._confidenceThreshold,
+        stableDetectionCount: this._stableDetectionCount,
+        consecutiveDetections: this.consecutiveDetections,
+        missedFrames: this.missedFrames,
+        state: this.state,
+        direction: this.currentDirection,
+        smoothedBox: this.smoothedBox,
+        inferenceTime: inferenceTime || 0,
+        inferenceFPS: inferenceTime > 0 ? (1000 / inferenceTime).toFixed(1) : '0',
+        device: this.activeDevice
       });
     }
 
-    // Filter detections by confidence
-    const validDetections = (detections || []).filter(
-      d => d.confidence >= this.confidenceThreshold
-    );
-
-    // Sort by confidence (best first)
-    validDetections.sort((a, b) => b.confidence - a.confidence);
-
-    if (validDetections.length > 0) {
-      const best = validDetections[0];
+    // ----------------------------------------------------
+    // BRANCH A: Valid detection above threshold
+    // ----------------------------------------------------
+    if (best) {
       best.label = this.currentTarget;
-
-      // Real detection succeeded, cancel fallback timer
-      if (this.searchFallbackTimer) {
-        clearTimeout(this.searchFallbackTimer);
-        this.searchFallbackTimer = null;
-      }
-
       this.missedFrames = 0;
       this.lostAnnounced = false;
       this.consecutiveDetections++;
 
-      // Push to temporal buffer
-      this.detectionBuffer.push(best);
-      if (this.detectionBuffer.length > this.bufferSize) {
-        this.detectionBuffer.shift();
-      }
-
       // Smooth bounding box
       this._smoothBox(best);
 
-      // Compute direction
+      // Compute direction with dead-zone and hysteresis
       const direction = this._computeDirection(this.smoothedBox);
 
-      if (this.consecutiveDetections >= this.foundThreshold) {
-        // Object reliably found
+      // Check if detection has reached stability requirement
+      if (this.consecutiveDetections >= this._stableDetectionCount) {
+        // TRANSITION: Candidate -> FOUND
         if (this.state === 'searching' || this.state === 'lost') {
           this.state = 'found';
+          this._vibrate([80, 50, 100]);
           this._emitStateChange({
             state: 'found',
             direction,
             target: this.currentTarget,
             box: this.smoothedBox,
-            confidence: best.confidence
+            confidence: best.confidence,
+            consecutiveDetections: this.consecutiveDetections
           });
-          this._speak(`Your ${this.currentTarget} is ${this._directionText(direction)}.`);
+          this._speak(`I found your ${this.currentTarget}. It's ${this._directionText(direction)}.`);
+
         } else {
-          // Already found, update guidance
+          // ACTIVE GUIDANCE
           this.state = 'guidance';
 
-          // Check if object is very close (fills frame)
+          // Check if object fills frame (Reached)
           const boxArea = this.smoothedBox.width * this.smoothedBox.height;
           if (boxArea > 0.35) {
-            // Object reached
             this.state = 'reached';
+            this._vibrate([100, 50, 100, 50, 200]);
             this._emitStateChange({
               state: 'reached',
               target: this.currentTarget,
@@ -510,37 +543,49 @@ class ObjectSearchEngine {
             direction,
             target: this.currentTarget,
             box: this.smoothedBox,
-            confidence: best.confidence
+            confidence: best.confidence,
+            consecutiveDetections: this.consecutiveDetections
           });
 
-          // Speak on direction change
+          // Debounced voice announcement on meaningful direction change
           if (direction !== this.lastSpokenDirection) {
             const now = Date.now();
             if (now - this.lastSpeakTime > this.speakCooldown) {
               this._speak(this._guidanceText(direction));
               this.lastSpokenDirection = direction;
               this.lastSpeakTime = now;
+              this._vibrate([40]);
             }
           }
         }
+
       } else {
-        // Building confidence, still searching
+        // CANDIDATE PHASE (e.g. frame 1 or 2 of 3)
+        // Remains strictly in searching, but hints live box to UI if enabled
         this._emitStateChange({
           state: 'searching',
           target: this.currentTarget,
-          detectionHint: true
+          candidateCount: this.consecutiveDetections,
+          stableTarget: this._stableDetectionCount,
+          box: this.smoothedBox,
+          confidence: best.confidence,
+          isCandidate: true
         });
       }
 
+    // ----------------------------------------------------
+    // BRANCH B: No detection above threshold
+    // ----------------------------------------------------
     } else {
-      // No valid detection
       this.missedFrames++;
+      // Decay candidate count smoothly
       this.consecutiveDetections = Math.max(0, this.consecutiveDetections - 1);
 
-      if (this.missedFrames >= this.maxMissedFrames) {
-        if (this.state === 'found' || this.state === 'guidance') {
+      // If object was previously found or in guidance:
+      if (this.state === 'found' || this.state === 'guidance') {
+        // Check grace period
+        if (this.missedFrames > this._lostTargetGracePeriod) {
           this.state = 'lost';
-          this.detectionBuffer = [];
           this.smoothedBox = null;
 
           this._emitStateChange({
@@ -549,15 +594,17 @@ class ObjectSearchEngine {
           });
 
           if (!this.lostAnnounced) {
-            this._speak('I lost the object. Move slowly.');
+            this._speak(`I lost the ${this.currentTarget}. Move slowly.`);
+            this._vibrate([50, 80, 50]);
             this.lostAnnounced = true;
           }
 
-          // After a moment, go back to searching
+          // Return to searching after calm pause
           setTimeout(() => {
             if (this.state === 'lost' && this.isSearching) {
               this.state = 'searching';
               this.consecutiveDetections = 0;
+              this.smoothedBox = null;
               this._emitStateChange({
                 state: 'searching',
                 target: this.currentTarget
@@ -565,48 +612,99 @@ class ObjectSearchEngine {
             }
           }, 2000);
         }
+
+      } else if (this.state === 'searching') {
+        // Check sustained search failure prompt (>16s without candidate)
+        const elapsed = Date.now() - this.searchStartTime;
+        const sinceLastPrompt = Date.now() - this.lastFailurePromptTime;
+
+        if (elapsed > 16000 && sinceLastPrompt > 20000) {
+          this._speak("I'm having trouble finding it. Move the phone slowly.");
+          this.lastFailurePromptTime = Date.now();
+        }
+
+        this._emitStateChange({
+          state: 'searching',
+          target: this.currentTarget,
+          candidateCount: 0,
+          box: null
+        });
       }
-      // If still in early searching, keep going
     }
   }
 
   // ==========================================
-  // BOUNDING BOX SMOOTHING
+  // BOUNDING BOX SMOOTHING (EMA)
   // ==========================================
 
   _smoothBox(detection) {
+    const rawX = detection.x ?? detection.xmin ?? 0;
+    const rawY = detection.y ?? detection.ymin ?? 0;
+    const rawW = detection.width ?? ((detection.xmax ?? 0) - rawX);
+    const rawH = detection.height ?? ((detection.ymax ?? 0) - rawY);
+
+    // Clamped coordinates [0, 1]
     const newBox = {
-      x: detection.x || detection.xmin || 0,
-      y: detection.y || detection.ymin || 0,
-      width: detection.width || 0,
-      height: detection.height || 0,
-      confidence: detection.confidence
+      x: Math.max(0, Math.min(1, rawX)),
+      y: Math.max(0, Math.min(1, rawY)),
+      width: Math.max(0.01, Math.min(1, rawW)),
+      height: Math.max(0.01, Math.min(1, rawH)),
+      confidence: detection.confidence || 0
     };
 
     if (!this.smoothedBox) {
       this.smoothedBox = { ...newBox };
     } else {
       const a = this.smoothingFactor;
-      this.smoothedBox.x = this.smoothedBox.x * a + newBox.x * (1 - a);
-      this.smoothedBox.y = this.smoothedBox.y * a + newBox.y * (1 - a);
-      this.smoothedBox.width = this.smoothedBox.width * a + newBox.width * (1 - a);
-      this.smoothedBox.height = this.smoothedBox.height * a + newBox.height * (1 - a);
+      this.smoothedBox.x = Math.max(0, Math.min(1, this.smoothedBox.x * a + newBox.x * (1 - a)));
+      this.smoothedBox.y = Math.max(0, Math.min(1, this.smoothedBox.y * a + newBox.y * (1 - a)));
+      this.smoothedBox.width = Math.max(0.01, Math.min(1, this.smoothedBox.width * a + newBox.width * (1 - a)));
+      this.smoothedBox.height = Math.max(0.01, Math.min(1, this.smoothedBox.height * a + newBox.height * (1 - a)));
       this.smoothedBox.confidence = newBox.confidence;
     }
   }
 
   // ==========================================
-  // DIRECTION COMPUTATION
+  // DIRECTION WITH DEAD-ZONE & HYSTERESIS
   // ==========================================
 
   _computeDirection(box) {
-    if (!box) return 'center';
-    // Center of the box
-    const centerX = box.x + box.width / 2;
+    if (!box) return this.currentDirection || 'center';
 
-    if (centerX < this.directionDeadZone.left) return 'left';
-    if (centerX > this.directionDeadZone.right) return 'right';
-    return 'center';
+    const centerX = box.x + box.width / 2;
+    const dz = this.directionDeadZone;
+    const h = this.hysteresisBuffer;
+
+    let newDirection = this.currentDirection || 'center';
+
+    if (this.currentDirection === 'center') {
+      if (centerX < dz.left - h) {
+        newDirection = 'left';
+      } else if (centerX > dz.right + h) {
+        newDirection = 'right';
+      } else {
+        newDirection = 'center';
+      }
+    } else if (this.currentDirection === 'left') {
+      if (centerX > dz.left + h) {
+        newDirection = (centerX > dz.right + h) ? 'right' : 'center';
+      } else {
+        newDirection = 'left';
+      }
+    } else if (this.currentDirection === 'right') {
+      if (centerX < dz.right - h) {
+        newDirection = (centerX < dz.left - h) ? 'left' : 'center';
+      } else {
+        newDirection = 'right';
+      }
+    } else {
+      if (centerX < dz.left) newDirection = 'left';
+      else if (centerX > dz.right) newDirection = 'right';
+      else newDirection = 'center';
+    }
+
+    this.currentDirection = newDirection;
+    return newDirection;
   }
 
   _directionText(direction) {
@@ -619,7 +717,7 @@ class ObjectSearchEngine {
   }
 
   _guidanceText(direction) {
-    const target = this.currentTarget || 'the object';
+    const target = this.currentTarget || 'object';
     switch (direction) {
       case 'left':
         return `Your ${target} is to your left. Turn left slowly.`;
@@ -633,22 +731,32 @@ class ObjectSearchEngine {
   }
 
   // ==========================================
-  // TEXT-TO-SPEECH
+  // SPEECH & HAPTICS
   // ==========================================
 
   _speak(text) {
     if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('[ObjectSearchEngine] Speech failed:', err);
+    }
+  }
 
-    // Cancel any pending speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.1;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    utterance.lang = 'en-US';
-
-    window.speechSynthesis.speak(utterance);
+  _vibrate(pattern) {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(pattern);
+      } catch (err) {
+        // Ignore on platforms without haptic vibration support
+      }
+    }
   }
 
   // ==========================================
@@ -668,5 +776,5 @@ class ObjectSearchEngine {
   }
 }
 
-// Export for use
+// Export for browser global
 window.ObjectSearchEngine = ObjectSearchEngine;
