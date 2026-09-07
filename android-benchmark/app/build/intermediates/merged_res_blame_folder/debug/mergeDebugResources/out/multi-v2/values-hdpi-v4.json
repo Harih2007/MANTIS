@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.mantis.benchmark.app-mergeDebugResources-2:/values-hdpi-v4/values-hdpi-v4.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\harih\\.gradle\\caches\\8.11.1\\transforms\\cfa8bd16898a2f24bab332256fea6aca\\transformed\\appcompat-1.7.0\\res\\values-hdpi-v4\\values-hdpi-v4.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "6",
+                        "endColumns": "13",
+                        "endOffsets": "327"
+                    }
+                }
+            ]
+        }
+    ]
+}
