@@ -13,6 +13,8 @@ class ObjectSearchEngine {
     this.worker = null;
     this.workerReady = false;
     this.workerError = null;
+    // WASM remains the validated default until WebGPU has been benchmarked on
+    // the target Android Chrome device. Debug mode can explicitly test WebGPU.
     this.preferredDevice = 'wasm'; // 'wasm' | 'webgpu'
     this.activeDevice = 'wasm';
 
@@ -27,8 +29,11 @@ class ObjectSearchEngine {
     this.lastFailurePromptTime = 0;
 
     // Configurable Parameters (CV & Stability)
-    this._confidenceThreshold = 0.12;  // Tunable (0.05, 0.10, 0.15, 0.20, 0.25)
-    this._stableDetectionCount = 3;    // Consecutive candidate frames before FOUND
+    // OWL-ViT's useful scores for everyday objects on mobile are often below
+    // 0.12. A lower admission threshold is safe only alongside the spatial
+    // stability check below; it must never independently trigger FOUND.
+    this._confidenceThreshold = 0.08;  // Tunable (0.05, 0.10, 0.15, 0.20, 0.25)
+    this._stableDetectionCount = 3;    // Minimum safe number of spatially-consistent frames before FOUND
     this._lostTargetGracePeriod = 4;   // Missed frames before declaring target LOST (~6-8s)
     this._inferenceInterval = 1800;    // Adaptive ms between captures
     this.minRate = 1200;
@@ -38,6 +43,10 @@ class ObjectSearchEngine {
     // Temporal detection tracking
     this.consecutiveDetections = 0;
     this.missedFrames = 0;
+    this.lastCandidateBox = null;
+    this.lastInferenceError = null;
+    this.inferenceFailures = 0;
+    this.errorAnnounced = false;
     this.lostAnnounced = false;
     this.state = 'idle'; // idle | loading | searching | found | guidance | reached | lost
 
@@ -272,6 +281,10 @@ class ObjectSearchEngine {
     this.state = 'searching';
     this.consecutiveDetections = 0;
     this.missedFrames = 0;
+    this.lastCandidateBox = null;
+    this.lastInferenceError = null;
+    this.inferenceFailures = 0;
+    this.errorAnnounced = false;
     this.lostAnnounced = false;
     this.smoothedBox = null;
     this.currentDirection = 'center';
@@ -309,6 +322,7 @@ class ObjectSearchEngine {
     this.smoothedBox = null;
     this.consecutiveDetections = 0;
     this.missedFrames = 0;
+    this.lastCandidateBox = null;
     this.pendingInference = false;
   }
 
@@ -446,6 +460,47 @@ class ObjectSearchEngine {
     const { detections, inferenceTime, device, id, error } = msg;
     if (device) this.activeDevice = device;
 
+    // A worker failure must never masquerade as a negative model result.
+    // Keeping the user in SEARCHING is correct, but exposing it to the
+    // developer HUD makes a browser/runtime fault diagnosable on-device.
+    if (error) {
+      this.lastInferenceError = error;
+      this.inferenceFailures++;
+      if (this._onDebug) {
+        this._onDebug({
+          target: this.currentTarget,
+          detections: [],
+          bestDetection: null,
+          confidenceThreshold: this._confidenceThreshold,
+          stableDetectionCount: this._stableDetectionCount,
+          consecutiveDetections: this.consecutiveDetections,
+          missedFrames: this.missedFrames,
+          state: this.state,
+          direction: this.currentDirection,
+          smoothedBox: this.smoothedBox,
+          inferenceTime: inferenceTime || 0,
+          inferenceFPS: '0',
+          device: this.activeDevice,
+          error,
+          inferenceFailures: this.inferenceFailures
+        });
+      }
+      this._emitStateChange({
+        state: 'vision-error',
+        target: this.currentTarget,
+        error,
+        inferenceFailures: this.inferenceFailures
+      });
+      if (!this.errorAnnounced) {
+        this._speak('Vision needs a moment. Keep the phone steady and try again.');
+        this.errorAnnounced = true;
+      }
+      return;
+    }
+
+    this.lastInferenceError = null;
+    this.inferenceFailures = 0;
+
     // Adapt inference rate to device capability
     if (inferenceTime > 0) {
       this.lastInferenceTime = inferenceTime;
@@ -492,10 +547,15 @@ class ObjectSearchEngine {
     // BRANCH A: Valid detection above threshold
     // ----------------------------------------------------
     if (best) {
-      best.label = this.currentTarget;
+      // A score alone is not stability. Require the candidate to remain in
+      // roughly the same place so unrelated noisy boxes cannot accumulate.
+      const candidateBox = this._normaliseBox(best);
+      const sameCandidate = !this.lastCandidateBox ||
+        this._intersectionOverUnion(candidateBox, this.lastCandidateBox) >= 0.25;
       this.missedFrames = 0;
       this.lostAnnounced = false;
-      this.consecutiveDetections++;
+      this.consecutiveDetections = sameCandidate ? this.consecutiveDetections + 1 : 1;
+      this.lastCandidateBox = candidateBox;
 
       // Smooth bounding box
       this._smoothBox(best);
@@ -580,6 +640,7 @@ class ObjectSearchEngine {
       this.missedFrames++;
       // Decay candidate count smoothly
       this.consecutiveDetections = Math.max(0, this.consecutiveDetections - 1);
+      this.lastCandidateBox = null;
 
       // If object was previously found or in guidance:
       if (this.state === 'found' || this.state === 'guidance') {
@@ -637,18 +698,33 @@ class ObjectSearchEngine {
   // BOUNDING BOX SMOOTHING (EMA)
   // ==========================================
 
-  _smoothBox(detection) {
-    const rawX = detection.x ?? detection.xmin ?? 0;
-    const rawY = detection.y ?? detection.ymin ?? 0;
-    const rawW = detection.width ?? ((detection.xmax ?? 0) - rawX);
-    const rawH = detection.height ?? ((detection.ymax ?? 0) - rawY);
+  _normaliseBox(detection) {
+    const x = detection.x ?? detection.xmin ?? 0;
+    const y = detection.y ?? detection.ymin ?? 0;
+    const width = detection.width ?? ((detection.xmax ?? 0) - x);
+    const height = detection.height ?? ((detection.ymax ?? 0) - y);
+    return {
+      x: Math.max(0, Math.min(1, x)),
+      y: Math.max(0, Math.min(1, y)),
+      width: Math.max(0.01, Math.min(1, width)),
+      height: Math.max(0.01, Math.min(1, height))
+    };
+  }
 
-    // Clamped coordinates [0, 1]
+  _intersectionOverUnion(a, b) {
+    const left = Math.max(a.x, b.x);
+    const top = Math.max(a.y, b.y);
+    const right = Math.min(a.x + a.width, b.x + b.width);
+    const bottom = Math.min(a.y + a.height, b.y + b.height);
+    const intersection = Math.max(0, right - left) * Math.max(0, bottom - top);
+    const union = a.width * a.height + b.width * b.height - intersection;
+    return union > 0 ? intersection / union : 0;
+  }
+
+  _smoothBox(detection) {
+    const normalised = this._normaliseBox(detection);
     const newBox = {
-      x: Math.max(0, Math.min(1, rawX)),
-      y: Math.max(0, Math.min(1, rawY)),
-      width: Math.max(0.01, Math.min(1, rawW)),
-      height: Math.max(0.01, Math.min(1, rawH)),
+      ...normalised,
       confidence: detection.confidence || 0
     };
 

@@ -569,6 +569,17 @@
           if (statusText) statusText.textContent = `Finding ${targetName}`;
         }
         break;
+
+      case 'vision-error':
+        // Keep the accessible experience calm and non-technical. Detailed
+        // worker diagnostics stay exclusively in the developer HUD.
+        if (currentScreen === 'searching') {
+          const statusText = document.getElementById('search-status-text');
+          const scanLine = document.getElementById('search-scan-line');
+          if (statusText) statusText.textContent = `Still looking for ${targetName}`;
+          if (scanLine) scanLine.style.display = '';
+        }
+        break;
     }
   }
 
@@ -896,7 +907,65 @@
       });
     }
 
+    // --- LOCAL ITEM REFERENCE ---
+    // Reuse the approved Object Memory action without adding a new screen.
+    // The reference stays on this device; it is not uploaded anywhere.
+    const updateLocationBtn = document.querySelector('#screen-object-memory button[aria-label="Update Location"]');
+    if (updateLocationBtn) {
+      updateLocationBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.setAttribute('capture', 'environment');
+        input.addEventListener('change', () => {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              localStorage.setItem('mantis-reference-headphones', JSON.stringify({
+                image: reader.result,
+                name: 'headphones',
+                savedAt: new Date().toISOString()
+              }));
+              const image = document.querySelector('#screen-object-memory img');
+              if (image) {
+                image.src = reader.result;
+                image.alt = 'Saved reference photo of your headphones';
+              }
+              announce('Reference photo saved on this device.');
+              if (navigator.vibrate) navigator.vibrate([60, 40, 90]);
+            } catch (error) {
+              console.warn('[MANTIS] Could not save reference photo:', error);
+              announce('Reference photo could not be saved.');
+            }
+          };
+          reader.readAsDataURL(file);
+        }, { once: true });
+        input.click();
+      });
+    }
+
+    // Restore a previously saved local reference when opening the screen.
+    try {
+      const savedReference = JSON.parse(localStorage.getItem('mantis-reference-headphones') || 'null');
+      const image = document.querySelector('#screen-object-memory img');
+      if (savedReference && savedReference.image && image) {
+        image.src = savedReference.image;
+        image.alt = 'Saved reference photo of your headphones';
+      }
+    } catch (error) {
+      console.warn('[MANTIS] Could not restore reference photo:', error);
+    }
+
     // --- MY SPACE Navigate buttons ---
+    const spaceNavigateHeadphones = document.querySelectorAll('.space-navigate-headphones');
+    spaceNavigateHeadphones.forEach(btn => {
+      btn.addEventListener('click', () => {
+        showScreen('objectMemory');
+      });
+    });
+
     const spaceNavigateButtons = document.querySelectorAll('.space-navigate-backpack');
     spaceNavigateButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1056,6 +1125,9 @@
         </div>
         <div style="grid-column: span 2; font-size:10px; color:#9c8f79;">
           Box: <span id="dbg-box" style="color:#d3c5ac;">[none]</span>
+        </div>
+        <div style="grid-column: span 2; font-size:10px; color:#ffb4ab; display:none;" id="dbg-error-row">
+          Worker: <span id="dbg-error">[none]</span>
         </div>
       </div>
 
@@ -1228,6 +1300,8 @@
         const confValEl = document.getElementById('dbg-conf-val');
         const confBarEl = document.getElementById('dbg-conf-bar');
         const boxEl = document.getElementById('dbg-box');
+        const errorRowEl = document.getElementById('dbg-error-row');
+        const errorEl = document.getElementById('dbg-error');
         const devBadge = document.getElementById('dbg-device-badge');
         const rtActive = document.getElementById('dbg-runtime-active');
 
@@ -1282,6 +1356,12 @@
           } else {
             boxEl.textContent = '[none]';
           }
+        }
+
+        if (errorRowEl && errorEl) {
+          const hasError = Boolean(data.error);
+          errorRowEl.style.display = hasError ? '' : 'none';
+          if (hasError) errorEl.textContent = String(data.error);
         }
       });
     }
