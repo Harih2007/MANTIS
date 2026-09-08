@@ -1,0 +1,425 @@
+/* ============================================
+   MANTIS — Styles
+   Extracted from Stitch design system exports
+   ============================================ */
+
+/* === Base Resets (from Stitch @layer base) === */
+@layer base {
+  html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+/* === Mobile-First App Shell === */
+#app-shell {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Desktop: dark surround behind the phone-width app */
+@media (min-width: 431px) {
+  body {
+    background: #0a0b0d;
+  }
+  #app-shell {
+    box-shadow: 0 0 80px rgba(0,0,0,0.6);
+  }
+}
+
+/* === Screen Management === */
+.screen {
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.screen.active {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+}
+
+/* Immersive screens (camera-based) take full viewport */
+.screen-immersive {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  z-index: 40;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* === Listening Pulse Animations (from Stitch screen 2) === */
+@keyframes subtle-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.15;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.28;
+  }
+}
+
+@keyframes subtle-breathe-inner {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.42;
+  }
+}
+
+.pulse-ring-outer {
+  animation: subtle-breathe 3.5s ease-in-out infinite;
+}
+
+.pulse-ring-inner {
+  animation: subtle-breathe-inner 3.5s ease-in-out infinite;
+}
+
+/* === Scanning Animation for Camera Search === */
+@keyframes scan-line {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+  animation: scan-line 2.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* === Bounding Box Appearance Animation === */
+@keyframes bbox-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.bbox-animate {
+  animation: bbox-appear 0.5s ease-out forwards;
+}
+
+/* === Status Pill Entrance === */
+@keyframes slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-down {
+  animation: slide-down 0.4s ease-out forwards;
+}
+
+/* === Reached Celebration Pulse === */
+@keyframes success-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 225, 118, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 20px rgba(74, 225, 118, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 225, 118, 0);
+  }
+}
+
+.success-pulse {
+  animation: success-pulse 1.5s ease-out 2;
+}
+
+/* === Progress Bar Animation (Understood state) === */
+@keyframes progress-fill {
+  0% { width: 0%; }
+  40% { width: 40%; }
+  70% { width: 70%; }
+  100% { width: 98%; }
+}
+
+.progress-animate {
+  animation: progress-fill 2.5s ease-out forwards;
+}
+
+/* === Camera Feed === */
+.camera-feed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.camera-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+/* === Focus States for Accessibility === */
+*:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 3px;
+}
+
+/* === Screen Reader Only (utility) === */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* === Fallback Input for Speech === */
+.fallback-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 1.5rem;
+}
+
+.fallback-input {
+  width: 100%;
+  height: 56px;
+  border-radius: 9999px;
+  background: #1e2022;
+  border: 1.5px solid rgba(156, 143, 121, 0.3);
+  color: #e2e2e5;
+  padding: 0 1.5rem;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.fallback-input:focus {
+  border-color: #fbbf24;
+}
+
+.fallback-input::placeholder {
+  color: #9c8f79;
+}
+
+.demo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 9999px;
+  background: #1e2022;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 48px;
+}
+
+.demo-chip:hover {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: #fbbf24;
+}
+
+.demo-chip:active {
+  transform: scale(0.97);
+}
+
+/* === Toggle Switches (from Stitch settings) === */
+.toggle-track {
+  position: relative;
+  width: 3.5rem;
+  height: 2rem;
+  background: #333537;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background 0.3s;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.toggle-track.active {
+  background: #fbbf24;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: #6c4f00;
+  transition: transform 0.3s;
+}
+
+.toggle-track.active .toggle-thumb {
+  transform: translateX(1.5rem);
+}
+
+/* === Guidance Direction Transition === */
+@keyframes direction-change {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.direction-animate {
+  animation: direction-change 0.3s ease-out;
+}
+
+/* === Model Loading Overlay === */
+.model-loading-overlay {
+  position: fixed;
+  inset: 0;
+  max-width: 430px;
+  margin: 0 auto;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 20, 22, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 2rem;
+}
+
+.model-loading-overlay.hidden {
+  display: none;
+}
+
+.model-progress-bar {
+  width: 100%;
+  max-width: 280px;
+  height: 6px;
+  background: #282a2c;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 1.5rem;
+}
+
+.model-progress-fill {
+  height: 100%;
+  background: #fbbf24;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
+/* === Live Bounding Box (real-time detection) === */
+.live-bbox {
+  position: absolute;
+  pointer-events: none;
+  z-index: 25;
+  border: 2px solid #fbbf24;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.08);
+  transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+}
+
+.live-bbox-label {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  padding: 2px 10px;
+  border-radius: 4px;
+  background: #fbbf24;
+  color: #402d00;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* === Detection Pulse Indicator === */
+@keyframes detection-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.detection-active {
+  animation: detection-pulse 1.5s ease-in-out infinite;
+}
