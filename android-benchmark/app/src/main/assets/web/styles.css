@@ -501,7 +501,7 @@ a:focus-visible {
   min-width: 0;
   position: relative;
   z-index: 60;
-  margin-top: -3rem;
+  margin-top: -7rem;
 }
 .screen-settings h1 { max-width: 100%; line-height: 1.15; }
 
