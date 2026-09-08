@@ -472,21 +472,27 @@ a:focus-visible {
 }
 .screen-space > header,
 .screen-settings > header {
-  position: absolute;
-  inset: 0 0 auto;
+  position: relative;
+  inset: auto;
   transform: none;
   height: calc(4rem + env(safe-area-inset-top, 0px));
   box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  left: auto;
+  right: auto;
+  flex: 0 0 auto;
 }
 .screen-space > main,
 .screen-settings > main {
   box-sizing: border-box;
   min-height: 100vh;
   min-height: 100dvh;
-  height: 100vh;
-  height: 100dvh;
+  min-height: 0;
+  height: auto;
+  flex: 1 1 auto;
   overflow-y: auto;
-  padding-top: calc(8rem + env(safe-area-inset-top, 0px)) !important;
+  padding-top: 1.5rem !important;
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 .screen-space > main > div,
