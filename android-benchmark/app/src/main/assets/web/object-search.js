@@ -173,6 +173,15 @@ class ObjectSearchEngine {
     // Remove leading articles / possessives
     text = text.replace(/^(my|the|a|an|those|these|that|this|some)\s+/i, '');
     text = text.replace(/\s+/g, ' ').trim();
+    const knownObjects = [
+      ['water bottle', 'water bottle'], ['headphones', 'headphones'],
+      ['headset', 'headphones'], ['earbuds', 'earbuds'], ['backpack', 'backpack'],
+      ['wallet', 'wallet'], ['bottle', 'bottle'], ['phone', 'phone'],
+      ['keys', 'keys'], ['key', 'keys'], ['glasses', 'glasses'], ['laptop', 'laptop'],
+      ['remote', 'remote'], ['book', 'book'], ['chair', 'chair'], ['cup', 'cup']
+    ];
+    const match = knownObjects.find(([phrase]) => new RegExp(`\\b${phrase}\\b`, 'i').test(text));
+    if (match) text = match[1];
 
     if (!text || text.length < 2) {
       text = (rawInput || '').trim();
