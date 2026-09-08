@@ -65,20 +65,32 @@ async function detect(imageData, targets, requestId) {
     }
     const tensor = new ort.Tensor('float32', input, [1, 3, SIZE, SIZE]);
     const output = (await session.run({ [session.inputNames[0]]: tensor }))[session.outputNames[0]];
-    const data = output.data, count = output.dims[2], classes = output.dims[1] - 4;
+    const data = output.data;
+    // Ultralytics exports are commonly [1, channels, candidates], but some
+    // converters transpose this to [1, candidates, channels]. Detect the
+    // orientation rather than silently reading coordinates as class scores.
+    const dimA = Number(output.dims[1]);
+    const dimB = Number(output.dims[2]);
+    const channelMajor = dimA < dimB;
+    const channels = channelMajor ? dimA : dimB;
+    const count = channelMajor ? dimB : dimA;
+    const classes = channels - 4;
+    const at = (channel, candidate) => channelMajor
+      ? Number(data[channel * count + candidate])
+      : Number(data[candidate * channels + channel]);
     const candidates = [];
     for (let i = 0; i < count; i++) {
       let bestClass = -1, bestScore = 0;
       for (let c = 0; c < classes; c++) {
-        const score = Number(data[(4 + c) * count + i]);
+        const score = at(4 + c, i);
         if (score > bestScore) { bestScore = score; bestClass = c; }
       }
       const label = LABELS[bestClass];
       // Do not discard weak-but-real candidates here. The main thread still
       // requires a confidence threshold plus temporal/spatial stability.
       if (!label || bestScore < 0.015 || !wanted(label, targets)) continue;
-      const cx = Number(data[i]), cy = Number(data[count + i]);
-      const w = Number(data[2 * count + i]), h = Number(data[3 * count + i]);
+      const cx = at(0, i), cy = at(1, i);
+      const w = at(2, i), h = at(3, i);
       candidates.push({ label, confidence: bestScore, x: Math.max(0, (cx - w / 2) / SIZE), y: Math.max(0, (cy - h / 2) / SIZE), width: w / SIZE, height: h / SIZE });
     }
     candidates.sort((a, b) => b.confidence - a.confidence);
