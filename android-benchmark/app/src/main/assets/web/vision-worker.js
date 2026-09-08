@@ -1,10 +1,12 @@
 /* MANTIS local YOLOv8n-OIV7 worker. */
-import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/+esm';
+// Bundle ONNX Runtime with the app. Remote CDN imports fail intermittently in
+// Android WebView (TLS/network policy), leaving the UI stuck on “Finding”.
+import * as ort from './ort.min.mjs';
 
 // The worker is served from the Android appasset origin. Point ONNX Runtime's
 // WASM binaries at the CDN explicitly instead of resolving them beside the
 // local worker file (which would produce a silent 404 in WebView).
-ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+ort.env.wasm.wasmPaths = new URL('./', import.meta.url).href;
 
 const SIZE = 320;
 const MODEL_URL = new URL('./yolov8n-oiv7.onnx', import.meta.url).href;

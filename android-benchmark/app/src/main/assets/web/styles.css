@@ -437,7 +437,8 @@ a:focus-visible {
   animation: detection-pulse 1.5s ease-in-out infinite;
 }
 /* Home find control: keep the primary action visually centered and easy to hit. */
-.home-voice-section { width: 100%; min-height: 360px; justify-content: center; align-items: center; margin-left: auto; margin-right: auto; }
+.screen-home > main { min-height: calc(100dvh - 80px); }
+.home-voice-section { width: 100%; flex: 1 1 auto; min-height: 0; justify-content: center; align-items: center; margin: 0 auto; }
 .home-mic-wrap { min-height: 136px; }
 #mic-trigger { min-width: 104px; min-height: 104px; }
 @media (max-height: 700px) {
