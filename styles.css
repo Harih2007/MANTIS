@@ -437,11 +437,11 @@ a:focus-visible {
   animation: detection-pulse 1.5s ease-in-out infinite;
 }
 /* Home find control: keep the primary action visually centered and easy to hit. */
-.screen-home > main { min-height: calc(100dvh - 80px); }
-.home-voice-section { width: 100%; flex: 1 1 auto; min-height: 0; justify-content: center; align-items: center; margin: 0 auto; }
+.screen-home > main { min-height: calc(100dvh - 80px); position: relative; }
+.home-voice-section { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; justify-content: center; align-items: center; margin: 0; padding-top: 0; padding-bottom: 4rem; }
 .home-mic-wrap { min-height: 136px; }
 #mic-trigger { min-width: 104px; min-height: 104px; }
 @media (max-height: 700px) {
-  .home-voice-section { padding-top: 1.5rem; min-height: 300px; }
+  .home-voice-section { padding-top: 0; }
   #mic-trigger { min-width: 92px; min-height: 92px; }
 }

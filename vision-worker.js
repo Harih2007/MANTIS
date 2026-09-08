@@ -15,7 +15,11 @@ const LABELS = {
   121: 'cup', 129: 'mouse', 134: 'phone', 237: 'handbag', 244: 'headphones',
   505: 'glasses', 577: 'watch'
 };
-const ALIASES = { phone: ['phone', 'corded phone', 'mobile phone'], glasses: ['glasses', 'sunglasses'] };
+const ALIASES = {
+  phone: ['phone', 'corded phone', 'mobile phone'],
+  glasses: ['glasses', 'sunglasses'],
+  backpack: ['backpack', 'bag', 'schoolbag', 'bookbag', 'handbag']
+};
 let session = null;
 let activeDevice = 'wasm';
 
@@ -45,6 +49,7 @@ async function initModel(preferredDevice = 'wasm') {
     self.postMessage({ type: 'init-progress', status: 'loading', progress: 95, device: activeDevice });
     self.postMessage({ type: 'init-complete', device: activeDevice });
   } catch (error) {
+    console.error('[MANTIS YOLO] inference failed', error);
     session = null;
     self.postMessage({ type: 'init-error', error: error.message || 'Failed to load YOLO model', device: activeDevice });
   }

@@ -486,6 +486,8 @@
         } else if (info.status === 'error') {
           console.warn('[MANTIS] Vision model failed:', info.error);
           if (overlay) overlay.classList.add('hidden');
+          const searchStatus = document.getElementById('search-status-text');
+          if (searchStatus) searchStatus.textContent = 'Vision unavailable — retry';
         }
       });
 
