@@ -490,7 +490,11 @@ a:focus-visible {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 .screen-space > main > div,
-.screen-settings > main > div { min-width: 0; }
+.screen-settings > main > div {
+  min-width: 0;
+  position: relative;
+  z-index: 60;
+}
 .screen-settings h1 { max-width: 100%; line-height: 1.15; }
 @media (max-height: 700px) {
   .home-voice-section { inset-block-start: calc(4rem + env(safe-area-inset-top, 0px)); }
