@@ -1,206 +1,89 @@
-/* ============================================
-   MANTIS — Vision Worker
-   Runs Transformers.js OWL-ViT inference
-   off the main thread
-   ============================================ */
+/* MANTIS local YOLOv8n-OIV7 worker. */
+import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/+esm';
 
-// Import Transformers.js from CDN
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
-
-// Configure: allow remote models, use browser cache
-env.allowLocalModels = false;
-
-// Model state
-let detector = null;
-let isLoading = false;
-let isReady = false;
+const SIZE = 320;
+const MODEL_URL = new URL('./yolov8n-oiv7.onnx', import.meta.url).href;
+const LABELS = {
+  15: 'backpack', 54: 'book', 57: 'bottle', 104: 'chair', 113: 'clock',
+  121: 'cup', 129: 'mouse', 134: 'phone', 237: 'handbag', 244: 'headphones',
+  505: 'glasses', 577: 'watch'
+};
+const ALIASES = { phone: ['phone', 'corded phone', 'mobile phone'], glasses: ['glasses', 'sunglasses'] };
+let session = null;
 let activeDevice = 'wasm';
 
-// ==========================================
-// MODEL INITIALIZATION
-// ==========================================
+function canonical(value) { return String(value || '').toLowerCase().replace(/[_-]/g, ' ').trim(); }
+function wanted(label, targets) {
+  const l = canonical(label);
+  return (Array.isArray(targets) ? targets : [targets]).some(target => {
+    const t = canonical(target);
+    return l === t || (ALIASES[t] || []).some(alias => l === alias);
+  });
+}
+function iou(a, b) {
+  const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x + a.width, b.x + b.width), y2 = Math.min(a.y + a.height, b.y + b.height);
+  const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  return inter / Math.max(1e-6, a.width * a.height + b.width * b.height - inter);
+}
+
 async function initModel(preferredDevice = 'wasm') {
-  if (isReady && activeDevice === preferredDevice) {
-    self.postMessage({ type: 'init-complete', device: activeDevice });
-    return;
-  }
-  if (isLoading) return;
-  isLoading = true;
-
-  // If re-initializing with different device, dispose existing
-  if (detector) {
-    try { await detector.dispose(); } catch (e) { /* ignore */ }
-    detector = null;
-    isReady = false;
-  }
-
-  // Attempt preferred device, fallback to wasm if webgpu fails
-  const devicesToTry = preferredDevice === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'];
-
-  for (const device of devicesToTry) {
-    try {
-      self.postMessage({
-        type: 'init-progress',
-        status: 'downloading',
-        progress: 0,
-        device
-      });
-
-      detector = await pipeline(
-        'zero-shot-object-detection',
-        'Xenova/owlvit-base-patch32',
-        {
-          device: device,
-          progress_callback: (progress) => {
-            if (progress.status === 'progress' && progress.progress !== undefined) {
-              self.postMessage({
-                type: 'init-progress',
-                status: 'downloading',
-                progress: Math.round(progress.progress),
-                file: progress.file || '',
-                device
-              });
-            } else if (progress.status === 'done') {
-              self.postMessage({
-                type: 'init-progress',
-                status: 'loading',
-                progress: 95,
-                device
-              });
-            }
-          }
-        }
-      );
-
-      activeDevice = device;
-      isReady = true;
-      isLoading = false;
-      self.postMessage({ type: 'init-complete', device: activeDevice });
-      return;
-
-    } catch (error) {
-      console.warn(`[VisionWorker] Device ${device} failed:`, error.message);
-      if (device === 'webgpu' && devicesToTry.includes('wasm')) {
-        self.postMessage({
-          type: 'init-progress',
-          status: 'warning',
-          message: 'WebGPU failed or unsupported. Falling back to WASM...',
-          progress: 10
-        });
-        continue;
-      }
-
-      isLoading = false;
-      isReady = false;
-      self.postMessage({
-        type: 'init-error',
-        error: error.message || `Failed to load vision model on ${device}`,
-        device
-      });
-      return;
-    }
-  }
-}
-
-// ==========================================
-// INFERENCE
-// ==========================================
-async function detect(imageData, targets, requestId) {
-  if (!isReady || !detector) {
-    self.postMessage({
-      type: 'result',
-      detections: [],
-      inferenceTime: 0,
-      id: requestId,
-      error: 'Model not ready'
-    });
-    return;
-  }
-
-  const startTime = performance.now();
-
+  if (session) { self.postMessage({ type: 'init-complete', device: activeDevice }); return; }
   try {
-    // Convert ImageData to a data URL via OffscreenCanvas
-    // OWL-ViT pipeline expects an image URL, Blob, or RawImage
-    const canvas = new OffscreenCanvas(imageData.width, imageData.height);
-    const ctx = canvas.getContext('2d');
-    ctx.putImageData(imageData, 0, 0);
-    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 });
-
-    // Create object URL for the blob
-    // Transformers.js can accept a Blob directly in newer versions
-    const candidateLabels = Array.isArray(targets) ? targets : [targets];
-
-    // Run the zero-shot detection pipeline
-    const results = await detector(blob, candidateLabels, {
-      threshold: 0.02, // Low raw floor so candidate scores are passed for client-side thresholding
-      percentage: true  // Return coordinates as percentages (0-1)
+    self.postMessage({ type: 'init-progress', status: 'downloading', progress: 0, device: 'wasm' });
+    session = await ort.InferenceSession.create(MODEL_URL, {
+      executionProviders: ['wasm'], graphOptimizationLevel: 'all'
     });
-
-    const inferenceTime = Math.round(performance.now() - startTime);
-
-    // Normalize output format
-    const detections = results.map(det => ({
-      label: det.label || candidateLabels[0],
-      confidence: det.score || 0,
-      x: det.box?.xmin ?? 0,
-      y: det.box?.ymin ?? 0,
-      width: (det.box?.xmax ?? 0) - (det.box?.xmin ?? 0),
-      height: (det.box?.ymax ?? 0) - (det.box?.ymin ?? 0),
-      // Also keep raw box
-      xmin: det.box?.xmin ?? 0,
-      ymin: det.box?.ymin ?? 0,
-      xmax: det.box?.xmax ?? 0,
-      ymax: det.box?.ymax ?? 0
-    }));
-
-    self.postMessage({
-      type: 'result',
-      detections,
-      inferenceTime,
-      device: activeDevice,
-      id: requestId
-    });
-
+    activeDevice = 'wasm';
+    self.postMessage({ type: 'init-progress', status: 'loading', progress: 95, device: activeDevice });
+    self.postMessage({ type: 'init-complete', device: activeDevice });
   } catch (error) {
-    const inferenceTime = Math.round(performance.now() - startTime);
-    self.postMessage({
-      type: 'result',
-      detections: [],
-      inferenceTime,
-      device: activeDevice,
-      id: requestId,
-      error: error.message || 'Inference failed'
-    });
+    session = null;
+    self.postMessage({ type: 'init-error', error: error.message || 'Failed to load YOLO model', device: activeDevice });
   }
 }
 
-// ==========================================
-// MESSAGE HANDLER
-// ==========================================
-self.onmessage = async function (e) {
-  const msg = e.data;
-
-  switch (msg.type) {
-    case 'init':
-      await initModel(msg.device || 'wasm');
-      break;
-
-    case 'detect':
-      await detect(msg.imageData, msg.targets, msg.id);
-      break;
-
-    case 'dispose':
-      if (detector) {
-        try {
-          await detector.dispose();
-        } catch (err) { /* ignore */ }
-        detector = null;
-        isReady = false;
+async function detect(imageData, targets, requestId) {
+  if (!session) { self.postMessage({ type: 'result', detections: [], inferenceTime: 0, id: requestId, error: 'Model not ready' }); return; }
+  const started = performance.now();
+  try {
+    const canvas = new OffscreenCanvas(SIZE, SIZE);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const source = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+    ctx.drawImage(await createImageBitmap(source), 0, 0, SIZE, SIZE);
+    const pixels = ctx.getImageData(0, 0, SIZE, SIZE).data;
+    const input = new Float32Array(3 * SIZE * SIZE);
+    for (let i = 0; i < SIZE * SIZE; i++) {
+      input[i] = pixels[i * 4] / 255;
+      input[SIZE * SIZE + i] = pixels[i * 4 + 1] / 255;
+      input[2 * SIZE * SIZE + i] = pixels[i * 4 + 2] / 255;
+    }
+    const tensor = new ort.Tensor('float32', input, [1, 3, SIZE, SIZE]);
+    const output = (await session.run({ [session.inputNames[0]]: tensor }))[session.outputNames[0]];
+    const data = output.data, count = output.dims[2], classes = output.dims[1] - 4;
+    const candidates = [];
+    for (let i = 0; i < count; i++) {
+      let bestClass = -1, bestScore = 0;
+      for (let c = 0; c < classes; c++) {
+        const score = Number(data[(4 + c) * count + i]);
+        if (score > bestScore) { bestScore = score; bestClass = c; }
       }
-      break;
-
-    default:
-      break;
+      const label = LABELS[bestClass];
+      if (!label || bestScore < 0.05 || !wanted(label, targets)) continue;
+      const cx = Number(data[i]), cy = Number(data[count + i]);
+      const w = Number(data[2 * count + i]), h = Number(data[3 * count + i]);
+      candidates.push({ label, confidence: bestScore, x: Math.max(0, (cx - w / 2) / SIZE), y: Math.max(0, (cy - h / 2) / SIZE), width: w / SIZE, height: h / SIZE });
+    }
+    candidates.sort((a, b) => b.confidence - a.confidence);
+    const detections = candidates.filter((candidate, index) => !candidates.slice(0, index).some(previous => iou(candidate, previous) > 0.5)).slice(0, 5);
+    self.postMessage({ type: 'result', detections, inferenceTime: Math.round(performance.now() - started), device: activeDevice, id: requestId });
+  } catch (error) {
+    self.postMessage({ type: 'result', detections: [], inferenceTime: Math.round(performance.now() - started), device: activeDevice, id: requestId, error: error.message || 'YOLO inference failed' });
   }
+}
+
+self.onmessage = async ({ data: msg }) => {
+  if (msg.type === 'init') await initModel(msg.device || 'wasm');
+  else if (msg.type === 'detect') await detect(msg.imageData, msg.targets, msg.id);
+  else if (msg.type === 'dispose') { if (session) await session.release(); session = null; }
 };
