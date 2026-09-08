@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.MantisBenchmark" parent="android:style/Theme.Material.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:colorAccent">#FFC107</item><item name="android:navigationBarColor">#111111</item><item name="android:statusBarColor">#111111</item></style>
-</resources>
