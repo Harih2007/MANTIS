@@ -474,6 +474,9 @@ a:focus-visible {
   padding-top: calc(5rem + env(safe-area-inset-top, 0px));
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
+.screen-settings > main {
+  padding-top: calc(7rem + env(safe-area-inset-top, 0px));
+}
 .screen-space > main > div,
 .screen-settings > main > div { min-width: 0; }
 .screen-settings h1 { max-width: 100%; line-height: 1.15; }
