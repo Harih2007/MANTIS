@@ -475,6 +475,8 @@ a:focus-visible {
   position: absolute;
   inset: 0 0 auto;
   transform: none;
+  height: calc(4rem + env(safe-area-inset-top, 0px));
+  box-sizing: border-box;
 }
 .screen-space > main,
 .screen-settings > main {
@@ -484,7 +486,7 @@ a:focus-visible {
   height: 100vh;
   height: 100dvh;
   overflow-y: auto;
-  padding-top: calc(8rem + env(safe-area-inset-top, 0px));
+  padding-top: calc(8rem + env(safe-area-inset-top, 0px)) !important;
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 .screen-space > main > div,
