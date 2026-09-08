@@ -1,0 +1,24 @@
+# Android / Gradle
+**/.gradle/
+**/build/
+*.iml
+.idea/
+local.properties
+
+# IDE and OS files
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local tooling/cache artifacts
+*.log
+*.tmp
+*.bak
+
+# Large local model/media files (keep them out of source control)
+*.onnx
+*.pt
+*.npy
+*.mp4
+*.wav
+*.tgz
