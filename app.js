@@ -83,6 +83,11 @@
     // Show target screen
     const target = document.getElementById(SCREENS[screenName]);
     if (target) {
+      // Each top-level screen starts at its intended layout origin. This prevents
+      // a previous scroll position from hiding headings beneath the fixed header.
+      target.scrollTop = 0;
+      const scrollRegion = target.querySelector('main');
+      if (scrollRegion) scrollRegion.scrollTop = 0;
       // Small delay for CSS transition
       requestAnimationFrame(() => {
         target.classList.add('active');
@@ -92,6 +97,8 @@
           heading.setAttribute('tabindex', '-1');
           heading.focus({ preventScroll: true });
         }
+        target.scrollTop = 0;
+        if (scrollRegion) scrollRegion.scrollTop = 0;
       });
     }
 
