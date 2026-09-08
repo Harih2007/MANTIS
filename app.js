@@ -201,10 +201,24 @@
   // SPEECH RECOGNITION
   // ==========================================
   const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let hasSpeechAPI = !!SpeechRecognitionAPI;
+  const NativeVoiceBridge = window.MantisVoice || null;
+  let hasSpeechAPI = !!SpeechRecognitionAPI || !!NativeVoiceBridge;
+
+  // Android WebView bridge: native SpeechRecognizer feeds the same result
+  // handler used by browser SpeechRecognition.
+  window.__mantisVoiceResult = (transcript, isFinal) => {
+    const titleEl = document.getElementById('listening-title');
+    if (titleEl && transcript) titleEl.textContent = `"${transcript}"`;
+    if (isFinal) handleVoiceResult((transcript || '').trim());
+  };
 
   function startSpeechRecognition() {
     if (!hasSpeechAPI) return;
+
+    if (!SpeechRecognitionAPI && NativeVoiceBridge) {
+      NativeVoiceBridge.start();
+      return;
+    }
 
     try {
       speechRecognition = new SpeechRecognitionAPI();
@@ -258,6 +272,7 @@
   }
 
   function stopSpeechRecognition() {
+    if (NativeVoiceBridge) NativeVoiceBridge.stop();
     if (speechRecognition) {
       try {
         speechRecognition.abort();

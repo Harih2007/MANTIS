@@ -3,6 +3,11 @@ package com.mantis.benchmark
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.content.Intent
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -17,6 +22,7 @@ import androidx.webkit.WebViewAssetLoader
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val cameraRequest = 42
+    private var speechRecognizer: SpeechRecognizer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,25 +32,29 @@ class MainActivity : ComponentActivity() {
             settings.mediaPlaybackRequiresUserGesture = false
             settings.allowFileAccess = false
             settings.allowContentAccess = true
+            addJavascriptInterface(VoiceBridge(), "MantisVoice")
             webViewClient = LocalAssetClient()
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest) {
                     runOnUiThread {
-                        if (request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
-                            request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
-                        }
+                        val allowed = request.resources.filter {
+                            it == PermissionRequest.RESOURCE_VIDEO_CAPTURE || it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                        }.toTypedArray()
+                        if (allowed.isNotEmpty()) request.grant(allowed)
                     }
                 }
             }
         }
         setContentView(webView)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), cameraRequest)
+        val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+        if (permissions.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
+            ActivityCompat.requestPermissions(this, permissions, cameraRequest)
         }
         webView.loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
     }
 
     override fun onDestroy() {
+        speechRecognizer?.destroy()
         webView.destroy()
         super.onDestroy()
     }
@@ -57,5 +67,43 @@ class MainActivity : ComponentActivity() {
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             return loader.shouldInterceptRequest(request.url)
         }
+    }
+
+    inner class VoiceBridge {
+        @JavascriptInterface fun start() {
+            runOnUiThread {
+                if (!SpeechRecognizer.isRecognitionAvailable(this@MainActivity)) {
+                    webView.evaluateJavascript("window.__mantisVoiceResult('', true)", null)
+                    return@runOnUiThread
+                }
+                speechRecognizer?.destroy()
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this@MainActivity).apply {
+                    setRecognitionListener(object : RecognitionListener {
+                        override fun onResults(results: Bundle?) {
+                            val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
+                            webView.evaluateJavascript("window.__mantisVoiceResult(${org.json.JSONObject.quote(text)}, true)", null)
+                        }
+                        override fun onError(error: Int) { webView.evaluateJavascript("window.__mantisVoiceResult('', true)", null) }
+                        override fun onPartialResults(partialResults: Bundle?) {
+                            val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
+                            if (text.isNotEmpty()) webView.evaluateJavascript("window.__mantisVoiceResult(${org.json.JSONObject.quote(text)}, false)", null)
+                        }
+                        override fun onReadyForSpeech(params: Bundle?) = Unit
+                        override fun onBeginningOfSpeech() = Unit
+                        override fun onRmsChanged(rmsdB: Float) = Unit
+                        override fun onBufferReceived(buffer: ByteArray?) = Unit
+                        override fun onEndOfSpeech() = Unit
+                        override fun onEvent(eventType: Int, params: Bundle?) = Unit
+                    })
+                }
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                }
+                speechRecognizer?.startListening(intent)
+            }
+        }
+        @JavascriptInterface fun stop() { runOnUiThread { speechRecognizer?.cancel() } }
     }
 }
