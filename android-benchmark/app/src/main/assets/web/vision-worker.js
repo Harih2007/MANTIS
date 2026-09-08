@@ -8,7 +8,8 @@ import * as ort from './ort.min.mjs';
 // local worker file (which would produce a silent 404 in WebView).
 ort.env.wasm.wasmPaths = new URL('./', import.meta.url).href;
 
-const SIZE = 320;
+// COCO YOLOv8n is exported with a 640x640 input shape.
+const SIZE = 640;
 const MODEL_URL = new URL('./yolov8n-coco.onnx', import.meta.url).href;
 const LABELS = {
   24: 'backpack', 26: 'handbag', 39: 'bottle', 41: 'cup', 56: 'chair',
