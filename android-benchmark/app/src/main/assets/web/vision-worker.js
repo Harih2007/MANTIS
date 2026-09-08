@@ -89,7 +89,12 @@ async function detect(imageData, targets, requestId) {
     for (let i = 0; i < count; i++) {
       let bestClass = -1, bestScore = 0;
       for (let c = 0; c < classes; c++) {
-        const score = at(4 + c, i);
+        const rawScore = at(4 + c, i);
+        // Some OIV7 exports expose logits while others expose probabilities.
+        // Normalize both forms so negative logits do not get discarded.
+        const score = (rawScore >= 0 && rawScore <= 1)
+          ? rawScore
+          : (1 / (1 + Math.exp(-rawScore)));
         if (score > bestScore) { bestScore = score; bestClass = c; }
       }
       const label = LABELS[bestClass];
