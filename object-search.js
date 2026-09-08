@@ -34,8 +34,8 @@ class ObjectSearchEngine {
     // stability check below; it must never independently trigger FOUND.
     // Mobile YOLO scores are lower after camera compression/low light. Keep
     // admission permissive, then rely on 3 spatially-consistent frames.
-    this._confidenceThreshold = 0.18;  // Reject weak laptop/table false positives
-    this._stableDetectionCount = 3;    // Minimum safe number of spatially-consistent frames before FOUND
+    this._confidenceThreshold = 0.30;  // Reject weak laptop/table false positives
+    this._stableDetectionCount = 5;    // Stronger confirmation for visually similar objects
     this._lostTargetGracePeriod = 4;   // Missed frames before declaring target LOST (~6-8s)
     this._inferenceInterval = 1800;    // Adaptive ms between captures
     this.minRate = 1200;
@@ -610,7 +610,7 @@ class ObjectSearchEngine {
           const boxArea = this.smoothedBox.width * this.smoothedBox.height;
           // A huge box is often a false positive on a laptop/table. Require
           // sustained high confidence before treating it as reached.
-          if (boxArea > 0.35 && best.confidence >= 0.28 && this.consecutiveDetections >= 4) {
+          if (boxArea > 0.35 && best.confidence >= 0.45 && this.consecutiveDetections >= 8) {
             this.state = 'reached';
             this._vibrate([100, 50, 100, 50, 200]);
             this._emitStateChange({
