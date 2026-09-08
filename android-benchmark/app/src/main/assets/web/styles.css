@@ -504,6 +504,28 @@ a:focus-visible {
   z-index: 60;
 }
 .screen-settings h1 { max-width: 100%; line-height: 1.15; }
+
+/* Android WebView is more reliable with one page scroll region than a
+   nested flex scroller behind the fixed bottom navigation. */
+.screen-space.active,
+.screen-settings.active {
+  display: block;
+  height: auto;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+.screen-space.active > main,
+.screen-settings.active > main {
+  display: block;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  padding-bottom: 2rem !important;
+}
 @media (max-height: 700px) {
   .home-voice-section { inset-block-start: calc(4rem + env(safe-area-inset-top, 0px)); }
   #mic-trigger { min-width: 92px; min-height: 92px; }
