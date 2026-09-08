@@ -7,6 +7,8 @@ import android.content.Intent
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -23,6 +25,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val cameraRequest = 42
     private var speechRecognizer: SpeechRecognizer? = null
+    private var textToSpeech: TextToSpeech? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +36,7 @@ class MainActivity : ComponentActivity() {
             settings.allowFileAccess = false
             settings.allowContentAccess = true
             addJavascriptInterface(VoiceBridge(), "MantisVoice")
+            addJavascriptInterface(TtsBridge(), "MantisTTS")
             webViewClient = LocalAssetClient()
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest) {
@@ -46,6 +50,9 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContentView(webView)
+        textToSpeech = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) textToSpeech?.language = Locale.US
+        }
         val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
         if (permissions.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
             ActivityCompat.requestPermissions(this, permissions, cameraRequest)
@@ -55,6 +62,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         speechRecognizer?.destroy()
+        textToSpeech?.shutdown()
         webView.destroy()
         super.onDestroy()
     }
@@ -105,5 +113,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         @JavascriptInterface fun stop() { runOnUiThread { speechRecognizer?.cancel() } }
+    }
+
+    inner class TtsBridge {
+        @JavascriptInterface fun speak(text: String) {
+            runOnUiThread {
+                textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mantis-guidance")
+            }
+        }
     }
 }

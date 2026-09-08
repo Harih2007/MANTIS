@@ -49,6 +49,7 @@
   // SCREEN READER ANNOUNCER
   // ==========================================
   function announce(message) {
+    if (window.MantisTTS && message) window.MantisTTS.speak(message);
     const el = document.getElementById('sr-announcer');
     if (el) {
       el.textContent = '';
