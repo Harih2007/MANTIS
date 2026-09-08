@@ -9,11 +9,11 @@ import * as ort from './ort.min.mjs';
 ort.env.wasm.wasmPaths = new URL('./', import.meta.url).href;
 
 const SIZE = 320;
-const MODEL_URL = new URL('./yolov8n-oiv7.onnx', import.meta.url).href;
+const MODEL_URL = new URL('./yolov8n-coco.onnx', import.meta.url).href;
 const LABELS = {
-  15: 'backpack', 54: 'book', 57: 'bottle', 104: 'chair', 113: 'clock',
-  121: 'cup', 129: 'mouse', 134: 'phone', 237: 'handbag', 244: 'headphones',
-  505: 'glasses', 577: 'watch'
+  24: 'backpack', 26: 'handbag', 39: 'bottle', 41: 'cup', 56: 'chair',
+  63: 'laptop', 64: 'mouse', 67: 'phone', 73: 'book', 74: 'clock',
+  75: 'remote', 76: 'scissors', 77: 'teddy bear', 78: 'hair drier', 79: 'toothbrush'
 };
 const ALIASES = {
   phone: ['phone', 'corded phone', 'mobile phone'],
