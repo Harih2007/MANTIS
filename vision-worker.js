@@ -105,8 +105,14 @@ async function detect(imageData, targets, requestId) {
       const w = at(2, i), h = at(3, i);
       candidates.push({ label, confidence: bestScore, x: Math.max(0, (cx - w / 2) / SIZE), y: Math.max(0, (cy - h / 2) / SIZE), width: w / SIZE, height: h / SIZE });
     }
-    candidates.sort((a, b) => b.confidence - a.confidence);
-    const detections = candidates.filter((candidate, index) => !candidates.slice(0, index).some(previous => iou(candidate, previous) > 0.5)).slice(0, 5);
+    // Tiny high-confidence fragments (straps, seams, wall patches) are common
+    // on backpacks. Prefer a coherent larger region while retaining confidence.
+    const usable = candidates.filter(d => d.width * d.height >= 0.035);
+    usable.sort((a, b) => {
+      const rank = d => d.confidence * (0.5 + Math.min(1, Math.sqrt(d.width * d.height) * 1.5));
+      return rank(b) - rank(a);
+    });
+    const detections = usable.filter((candidate, index) => !usable.slice(0, index).some(previous => iou(candidate, previous) > 0.5)).slice(0, 5);
     self.postMessage({ type: 'result', detections, inferenceTime: Math.round(performance.now() - started), device: activeDevice, id: requestId });
   } catch (error) {
     self.postMessage({ type: 'result', detections: [], inferenceTime: Math.round(performance.now() - started), device: activeDevice, id: requestId, error: error.message || 'YOLO inference failed' });

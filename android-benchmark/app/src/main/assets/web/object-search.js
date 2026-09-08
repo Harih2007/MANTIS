@@ -574,7 +574,7 @@ class ObjectSearchEngine {
       // roughly the same place so unrelated noisy boxes cannot accumulate.
       const candidateBox = this._normaliseBox(best);
       const sameCandidate = !this.lastCandidateBox ||
-        this._intersectionOverUnion(candidateBox, this.lastCandidateBox) >= 0.25;
+        this._intersectionOverUnion(candidateBox, this.lastCandidateBox) >= 0.10;
       this.missedFrames = 0;
       this.lostAnnounced = false;
       this.consecutiveDetections = sameCandidate ? this.consecutiveDetections + 1 : 1;
