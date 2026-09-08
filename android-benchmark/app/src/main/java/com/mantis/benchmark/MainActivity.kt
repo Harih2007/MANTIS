@@ -14,6 +14,7 @@ import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            // Always read the bundled UI assets after an APK update; otherwise
+            // WebView can keep an older CSS/JS copy across reinstallations.
+            settings.cacheMode = WebSettings.LOAD_NO_CACHE
             settings.mediaPlaybackRequiresUserGesture = false
             settings.allowFileAccess = false
             settings.allowContentAccess = true
