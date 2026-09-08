@@ -32,7 +32,9 @@ class ObjectSearchEngine {
     // OWL-ViT's useful scores for everyday objects on mobile are often below
     // 0.12. A lower admission threshold is safe only alongside the spatial
     // stability check below; it must never independently trigger FOUND.
-    this._confidenceThreshold = 0.08;  // Tunable (0.05, 0.10, 0.15, 0.20, 0.25)
+    // Mobile YOLO scores are lower after camera compression/low light. Keep
+    // admission permissive, then rely on 3 spatially-consistent frames.
+    this._confidenceThreshold = 0.04;  // Tunable in the debug HUD
     this._stableDetectionCount = 3;    // Minimum safe number of spatially-consistent frames before FOUND
     this._lostTargetGracePeriod = 4;   // Missed frames before declaring target LOST (~6-8s)
     this._inferenceInterval = 1800;    // Adaptive ms between captures

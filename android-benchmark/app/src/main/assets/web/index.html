@@ -156,20 +156,20 @@
       <main class="flex-1 flex flex-col relative w-full pt-20 pb-28 bg-surface px-margin-mobile">
         <div class="flex flex-col w-full max-w-md mx-auto">
           <!-- Voice Query Section -->
-          <section aria-label="Voice Query" class="flex flex-col items-center text-center pt-6 pb-8">
-            <h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface tracking-tight max-w-[280px] mb-8">
+          <section aria-label="Voice Query" class="flex flex-col items-center text-center pt-10 pb-8 home-voice-section">
+            <h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface tracking-tight max-w-[320px] mb-10">
               What are you looking for?
             </h1>
-            <div class="relative flex items-center justify-center mb-6">
-              <div class="absolute w-24 h-24 rounded-full bg-primary-container/20 pointer-events-none" id="home-ambient-pulse"></div>
+            <div class="relative flex items-center justify-center mb-7 home-mic-wrap">
+              <div class="absolute w-36 h-36 rounded-full bg-primary-container/20 pointer-events-none" id="home-ambient-pulse"></div>
               <button
                 aria-label="Tap to speak. Start voice search."
                 aria-pressed="false"
-                class="relative z-10 w-[72px] h-[72px] rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg shadow-primary-container/20 active:scale-95 transition-transform duration-150 focus:outline-none focus:ring-4 focus:ring-primary-fixed"
+                class="relative z-10 w-[104px] h-[104px] rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-xl shadow-primary-container/30 active:scale-95 transition-transform duration-150 focus:outline-none focus:ring-4 focus:ring-primary-fixed"
                 id="mic-trigger"
                 type="button"
               >
-                <span class="material-symbols-outlined text-[36px] text-on-primary-container select-none" style="font-variation-settings: 'FILL' 1;">mic</span>
+                <span class="material-symbols-outlined text-[52px] text-on-primary-container select-none" style="font-variation-settings: 'FILL' 1;">mic</span>
               </button>
             </div>
             <div class="flex flex-col items-center gap-1.5">

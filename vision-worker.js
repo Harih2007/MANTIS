@@ -74,7 +74,9 @@ async function detect(imageData, targets, requestId) {
         if (score > bestScore) { bestScore = score; bestClass = c; }
       }
       const label = LABELS[bestClass];
-      if (!label || bestScore < 0.05 || !wanted(label, targets)) continue;
+      // Do not discard weak-but-real candidates here. The main thread still
+      // requires a confidence threshold plus temporal/spatial stability.
+      if (!label || bestScore < 0.015 || !wanted(label, targets)) continue;
       const cx = Number(data[i]), cy = Number(data[count + i]);
       const w = Number(data[2 * count + i]), h = Number(data[3 * count + i]);
       candidates.push({ label, confidence: bestScore, x: Math.max(0, (cx - w / 2) / SIZE), y: Math.max(0, (cy - h / 2) / SIZE), width: w / SIZE, height: h / SIZE });
