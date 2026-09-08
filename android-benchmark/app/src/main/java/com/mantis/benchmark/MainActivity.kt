@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
             // Always read the bundled UI assets after an APK update; otherwise
             // WebView can keep an older CSS/JS copy across reinstallations.
             settings.cacheMode = WebSettings.LOAD_NO_CACHE
+            clearCache(true)
             settings.mediaPlaybackRequiresUserGesture = false
             settings.allowFileAccess = false
             settings.allowContentAccess = true
