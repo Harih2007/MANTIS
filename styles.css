@@ -475,7 +475,7 @@ a:focus-visible {
   position: relative;
   inset: auto;
   transform: none;
-  height: calc(4rem + env(safe-area-inset-top, 0px));
+  height: auto;
   box-sizing: border-box;
   width: 100%;
   max-width: none;
@@ -493,7 +493,7 @@ a:focus-visible {
   flex: 1 1 auto;
   overflow-y: auto;
   /* Headers are in normal flow, so only a comfortable section gap is needed. */
-  padding-top: 1.5rem !important;
+  padding-top: 0 !important;
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 .screen-space > main > div,
