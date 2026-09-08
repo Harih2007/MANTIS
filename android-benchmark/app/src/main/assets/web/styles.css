@@ -492,7 +492,9 @@ a:focus-visible {
   height: auto;
   flex: 1 1 auto;
   overflow-y: auto;
-  padding-top: 1.5rem !important;
+  /* Keep headings below the Android/WebView top bar even when it is
+     composited as an overlay during viewport resize. */
+  padding-top: calc(6.5rem + env(safe-area-inset-top, 0px)) !important;
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 .screen-space > main > div,
