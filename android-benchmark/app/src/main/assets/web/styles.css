@@ -465,12 +465,25 @@ a:focus-visible {
 
 /* Scrollable preference/memory screens keep fixed headers and nav out of the content. */
 .screen-space,
-.screen-settings { overflow-y: auto; overscroll-behavior: contain; }
+.screen-settings {
+  position: relative;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.screen-space > header,
+.screen-settings > header {
+  position: absolute;
+  inset: 0 0 auto;
+  transform: none;
+}
 .screen-space > main,
 .screen-settings > main {
   box-sizing: border-box;
   min-height: 100vh;
   min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   padding-top: calc(5rem + env(safe-area-inset-top, 0px));
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
