@@ -1,5 +1,6 @@
 /* MANTIS local YOLOv8n-OIV7 worker. */
 import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/+esm';
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 
 const SIZE = 320;
 const MODEL_URL = new URL('./yolov8n-oiv7.onnx', import.meta.url).href;

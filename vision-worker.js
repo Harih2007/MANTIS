@@ -1,6 +1,11 @@
 /* MANTIS local YOLOv8n-OIV7 worker. */
 import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/+esm';
 
+// The worker is served from the Android appasset origin. Point ONNX Runtime's
+// WASM binaries at the CDN explicitly instead of resolving them beside the
+// local worker file (which would produce a silent 404 in WebView).
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+
 const SIZE = 320;
 const MODEL_URL = new URL('./yolov8n-oiv7.onnx', import.meta.url).href;
 const LABELS = {
