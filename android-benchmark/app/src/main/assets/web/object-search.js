@@ -826,6 +826,7 @@ class ObjectSearchEngine {
   // ==========================================
 
   _speak(text) {
+    if (window.MantisVoiceEnabled === false) return;
     if (window.MantisTTS && text) { window.MantisTTS.speak(text); return; }
     if (!('speechSynthesis' in window)) return;
     try {

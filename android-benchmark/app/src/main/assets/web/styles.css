@@ -332,6 +332,19 @@ a:focus-visible {
   transition: transform 0.3s;
 }
 
+/* Keep preference copy from colliding with the switch on narrow phones. */
+.settings-row-copy { min-width: 0; flex: 1 1 auto; }
+.settings-row-copy > div { min-width: 0; }
+.settings-row-copy .text-body-sm { display: block; white-space: normal; line-height: 1.25; }
+.settings-row > .toggle-track { margin-left: 0.75rem; }
+.settings-row { gap: 0.75rem; }
+.settings-header { max-width: 100%; }
+@media (max-width: 380px) {
+  .settings-row { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .settings-row-copy { gap: 0.5rem; padding-right: 0 !important; }
+  .settings-row-copy .text-body-sm { font-size: 0.72rem; }
+}
+
 .toggle-track.active .toggle-thumb {
   transform: translateX(1.5rem);
 }

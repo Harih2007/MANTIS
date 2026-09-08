@@ -36,6 +36,8 @@
   let speechRecognition = null;
   let guidanceTimers = [];
   let searchTimers = [];
+  let voiceEnabled = localStorage.getItem('mantis-voice-enabled') !== 'false';
+  window.MantisVoiceEnabled = voiceEnabled;
 
   // ==========================================
   // DETECTION ENGINE
@@ -49,7 +51,7 @@
   // SCREEN READER ANNOUNCER
   // ==========================================
   function announce(message) {
-    if (window.MantisTTS && message) window.MantisTTS.speak(message);
+    if (voiceEnabled && window.MantisTTS && message) window.MantisTTS.speak(message);
     const el = document.getElementById('sr-announcer');
     if (el) {
       el.textContent = '';
@@ -280,6 +282,17 @@
       } catch (e) { /* ignore */ }
       speechRecognition = null;
     }
+  }
+
+  function setVoiceEnabled(enabled) {
+    voiceEnabled = Boolean(enabled);
+    localStorage.setItem('mantis-voice-enabled', String(voiceEnabled));
+    if (!voiceEnabled) {
+      stopSpeechRecognition();
+      if (window.MantisTTS) window.MantisTTS.stop();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+    window.MantisVoiceEnabled = voiceEnabled;
   }
 
   function showFallbackInput() {
@@ -1399,8 +1412,15 @@
           track.classList.toggle('active');
           const isActive = track.classList.contains('active');
           row.setAttribute('aria-checked', isActive ? 'true' : 'false');
+          if (rowId === 'toggle-voice-row') setVoiceEnabled(isActive);
         }
       };
+
+      if (rowId === 'toggle-voice-row') {
+        const active = voiceEnabled;
+        if (track) track.classList.toggle('active', active);
+        row.setAttribute('aria-checked', active ? 'true' : 'false');
+      }
 
       row.addEventListener('click', handler);
       row.addEventListener('keydown', (e) => {
@@ -1460,6 +1480,21 @@
       if (navigator.vibrate) {
         navigator.vibrate([100, 80, 150]);
       }
+      if (voiceEnabled && window.MantisTTS) window.MantisTTS.speak('Feedback test complete.');
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          const audio = new AudioContextClass();
+          const oscillator = audio.createOscillator();
+          const gain = audio.createGain();
+          oscillator.frequency.value = 660;
+          gain.gain.setValueAtTime(0.001, audio.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.12, audio.currentTime + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.18);
+          oscillator.connect(gain).connect(audio.destination);
+          oscillator.start(); oscillator.stop(audio.currentTime + 0.2);
+        }
+      } catch (error) { console.warn('[MANTIS] Feedback chime unavailable:', error); }
 
       const prevText = label.textContent;
       label.textContent = 'Signal Tested ✓';
