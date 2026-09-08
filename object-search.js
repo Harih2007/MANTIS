@@ -254,6 +254,13 @@ class ObjectSearchEngine {
   // ==========================================
 
   async initWorker(preferredDevice = null) {
+    // A failed module/WASM load leaves a Worker object behind. Recreate it on
+    // the next attempt; otherwise retries stay permanently stuck in searching.
+    if (this.worker && this.workerError) {
+      try { this.worker.terminate(); } catch (error) { /* already stopped */ }
+      this.worker = null;
+      this.workerReady = false;
+    }
     if (this.worker) return;
     if (preferredDevice) this.preferredDevice = preferredDevice;
 
@@ -265,6 +272,7 @@ class ObjectSearchEngine {
       this.worker.onerror = (err) => {
         console.error('[ObjectSearchEngine] Worker error:', err);
         this.workerError = err.message || 'Worker failed';
+        this.workerReady = false;
         this._emitModelLoading({ status: 'error', progress: 0, error: this.workerError });
       };
 
@@ -320,7 +328,7 @@ class ObjectSearchEngine {
     });
 
     // Initialize worker if needed
-    if (!this.worker) {
+    if (!this.worker || this.workerError) {
       await this.initWorker();
     } else if (this.workerReady) {
       this._startCapture();
